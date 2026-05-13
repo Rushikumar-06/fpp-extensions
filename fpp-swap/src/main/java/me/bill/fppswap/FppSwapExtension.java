@@ -144,6 +144,11 @@ public final class FppSwapExtension implements FppExtension {
     }
 
     @Override
+    public @NotNull Material getIcon() {
+      return Material.ENDER_PEARL;
+    }
+
+    @Override
     public boolean execute(@NotNull CommandSender sender, @NotNull String[] args) {
       if (!enabled()) {
         sender.sendMessage("Swap extension is disabled.");

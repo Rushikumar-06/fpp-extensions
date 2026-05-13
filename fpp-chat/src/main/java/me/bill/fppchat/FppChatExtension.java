@@ -15,6 +15,7 @@ import me.bill.fakePlayerPlugin.config.Config;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayer;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayerManager;
 import me.bill.fakePlayerPlugin.lang.Lang;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
@@ -158,6 +159,11 @@ public final class FppChatExtension implements FppExtension {
     @Override
     public @NotNull String getPermission() {
       return permission();
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.WRITABLE_BOOK;
     }
 
     @Override

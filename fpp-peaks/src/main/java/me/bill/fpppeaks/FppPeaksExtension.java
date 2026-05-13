@@ -16,6 +16,7 @@ import me.bill.fakePlayerPlugin.fakeplayer.FakePlayerManager;
 import me.bill.fakePlayerPlugin.lang.Lang;
 import me.bill.fakePlayerPlugin.util.FppScheduler;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
@@ -121,6 +122,11 @@ public final class FppPeaksExtension implements FppExtension {
     @Override
     public @NotNull String getPermission() {
       return permission();
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.SUNFLOWER;
     }
 
     @Override

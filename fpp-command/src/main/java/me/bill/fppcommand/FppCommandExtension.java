@@ -12,6 +12,7 @@ import me.bill.fakePlayerPlugin.fakeplayer.FakePlayerManager;
 import me.bill.fakePlayerPlugin.lang.Lang;
 import me.bill.fakePlayerPlugin.util.FppLogger;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -116,6 +117,11 @@ public final class FppCommandExtension implements FppExtension {
     @Override
     public @NotNull String getPermission() {
       return commandPermission();
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.COMMAND_BLOCK;
     }
 
     @Override

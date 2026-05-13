@@ -17,6 +17,7 @@ import me.bill.fppaichat.ai.BotConversationManager;
 import me.bill.fppaichat.ai.PersonalityRepository;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -237,6 +238,11 @@ public final class FppAiChatExtension implements FppExtension, Listener {
     @Override
     public @NotNull String getPermission() {
       return "fpp.aichat.personality";
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.WRITABLE_BOOK;
     }
 
     @Override

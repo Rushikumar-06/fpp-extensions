@@ -10,6 +10,7 @@ import me.bill.fakePlayerPlugin.api.FppBot;
 import me.bill.fakePlayerPlugin.api.FppExtension;
 import me.bill.fakePlayerPlugin.api.event.FppBotDespawnEvent;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -115,6 +116,11 @@ public final class FppWaypointsExtension implements FppExtension, Listener {
     @Override
     public @NotNull String getPermission() {
       return "fpp.waypoint";
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.COMPASS;
     }
 
     @Override

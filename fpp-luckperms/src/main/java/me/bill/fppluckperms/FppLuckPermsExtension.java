@@ -19,6 +19,7 @@ import me.bill.fakePlayerPlugin.util.FppScheduler;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -152,6 +153,11 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     }
 
     @Override
+    public @NotNull Material getIcon() {
+      return Material.GOLDEN_HELMET;
+    }
+
+    @Override
     public boolean execute(@NotNull CommandSender sender, @NotNull String[] args) {
       if (!enabled()) {
         sender.sendMessage("LuckPerms extension is disabled.");
@@ -244,6 +250,11 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     @Override
     public @NotNull String getPermission() {
       return permission("rank", "fpp.rank");
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.GOLDEN_CHESTPLATE;
     }
 
     @Override

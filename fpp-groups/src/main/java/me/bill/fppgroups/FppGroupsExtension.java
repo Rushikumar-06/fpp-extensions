@@ -128,6 +128,11 @@ public final class FppGroupsExtension implements FppExtension {
     }
 
     @Override
+    public @NotNull Material getIcon() {
+      return Material.CHEST;
+    }
+
+    @Override
     public boolean execute(@NotNull CommandSender sender, @NotNull String[] args) {
       if (!enabled()) {
         sender.sendMessage(msg("Bot groups addon is disabled.", NamedTextColor.RED));

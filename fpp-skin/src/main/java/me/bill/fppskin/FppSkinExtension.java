@@ -15,6 +15,7 @@ import me.bill.fakePlayerPlugin.fakeplayer.SkinRepository;
 import me.bill.fakePlayerPlugin.lang.Lang;
 import me.bill.fakePlayerPlugin.util.FppScheduler;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -24,6 +25,7 @@ public final class FppSkinExtension implements FppExtension {
   private FakePlayerPlugin core;
   private FppAddonCommand command;
   private SkinManager skinManager;
+  private FppSkinFetcher skinFetcher;
 
   @Override
   public @NotNull String getName() {
@@ -56,6 +58,8 @@ public final class FppSkinExtension implements FppExtension {
     saveDefaultConfig();
     syncSkinConfig();
     ensureSkinFolder();
+    skinFetcher = new FppSkinFetcher();
+    core.setSkinFetchService(skinFetcher);
     SkinRepository.get().init(core);
     skinManager = new SkinManager(core);
     core.setSkinManager(skinManager);
@@ -70,6 +74,10 @@ public final class FppSkinExtension implements FppExtension {
     if (core != null && core.getSkinManager() == skinManager) {
       core.setSkinManager(null);
     }
+    if (core != null && core.getSkinFetchService() == skinFetcher) {
+      core.setSkinFetchService(null);
+    }
+    skinFetcher = null;
     skinManager = null;
     command = null;
     core = null;
@@ -144,7 +152,7 @@ public final class FppSkinExtension implements FppExtension {
 
     @Override
     public @NotNull String getUsage() {
-      return "<bot> <username|url|reset>";
+      return "<bot> <username|reset|--url <url>>";
     }
 
     @Override
@@ -155,6 +163,11 @@ public final class FppSkinExtension implements FppExtension {
     @Override
     public @NotNull String getPermission() {
       return permission();
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.PLAYER_HEAD;
     }
 
     @Override
@@ -207,6 +220,19 @@ public final class FppSkinExtension implements FppExtension {
         return true;
       }
 
+      if (skinArg.equalsIgnoreCase("--url")) {
+        if (args.length < 3) {
+          sender.sendMessage(Lang.get("skin-usage"));
+          return true;
+        }
+        String url = args[2];
+        sender.sendMessage(Lang.get("skin-applying", "name", bot.getDisplayName()));
+        activeSkinManager
+            .applySkinByUrl(bot, url)
+            .thenAccept(success -> sendApplyResult(sender, bot, success, null));
+        return true;
+      }
+
       if (isUrlSkin(skinArg)) {
         sender.sendMessage(Lang.get("skin-applying", "name", bot.getDisplayName()));
         activeSkinManager
@@ -238,6 +264,7 @@ public final class FppSkinExtension implements FppExtension {
         String prefix = args[1].toLowerCase(Locale.ROOT);
         List<String> options = new ArrayList<>();
         options.add("reset");
+        options.add("--url");
         for (Player player : Bukkit.getOnlinePlayers()) {
           if (manager == null || manager.getByUuid(player.getUniqueId()) == null) {
             options.add(player.getName());
@@ -245,6 +272,12 @@ public final class FppSkinExtension implements FppExtension {
         }
         return options.stream()
             .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix))
+            .toList();
+      }
+
+      if (args.length == 3 && args[1].equalsIgnoreCase("--url")) {
+        return List.of("https://").stream()
+            .filter(option -> option.startsWith(args[2].toLowerCase(Locale.ROOT)))
             .toList();
       }
 

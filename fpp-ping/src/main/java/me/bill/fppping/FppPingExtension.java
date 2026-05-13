@@ -12,6 +12,7 @@ import me.bill.fakePlayerPlugin.api.FppBot;
 import me.bill.fakePlayerPlugin.api.FppExtension;
 import me.bill.fakePlayerPlugin.config.Config;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -120,6 +121,11 @@ public final class FppPingExtension implements FppExtension {
     @Override
     public @NotNull String getPermission() {
       return perm("base", "fpp.ping");
+    }
+
+    @Override
+    public @NotNull Material getIcon() {
+      return Material.CLOCK;
     }
 
     @Override
