@@ -58,7 +58,6 @@ fake-player-plugin/
 
 # Documentation (auto-generated)
 */README.md
-CHANGELOG.md
 
 # Keep libs (vendor) unless you want to ignore them intentionally
 # /libs/
