@@ -196,4 +196,4 @@ MIT License - See LICENSE file for details
 ## Support
 
 - Issues: https://github.com/yourusername/fpp-extensions/issues
-- Discord: [Your Discord Server]
+- Discord: https://discord.gg/WRvfmV24Hh
