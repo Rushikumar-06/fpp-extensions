@@ -119,6 +119,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
 
     String group = LuckPermsHelper.prepareOnlineBotUser(bot.getUuid(), defaultGroup());
     if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
+    LuckPermsHelper.queuePermissionRefresh(core, manager, bot.getUuid());
   }
 
   @EventHandler(priority = EventPriority.LOWEST)
@@ -157,6 +158,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
           FakePlayer bot = manager != null ? manager.getByUuid(uuid) : null;
           if (bot == null) return;
           if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
+          LuckPermsHelper.queuePermissionRefresh(core, manager, uuid);
           manager.refreshDisplayName(bot);
           manager.persistBotSettings(bot);
         });
@@ -378,6 +380,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
                       core,
                       () -> {
                         if (manager.getByName(bot.getName()) == null) return;
+                        LuckPermsHelper.queuePermissionRefresh(core, manager, bot.getUuid());
                         manager.refreshDisplayName(bot);
                       },
                       2L);

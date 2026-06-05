@@ -17,6 +17,7 @@ import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 public final class LuckPermsHelper {
@@ -72,6 +73,7 @@ public final class LuckPermsHelper {
                     }
                     if (newGroup == null) newGroup = "default";
                     fp.setLuckpermsGroup(newGroup);
+                    queuePermissionRefresh(plugin, manager, uuid);
                     queueDisplayRefresh(plugin, manager, uuid);
                     debug(
                         "UserDataRecalculate for bot '"
@@ -133,6 +135,19 @@ public final class LuckPermsHelper {
       iterator.remove();
       return uuid;
     }
+  }
+
+  public static void queuePermissionRefresh(
+      FakePlayerPlugin plugin, FakePlayerManager manager, UUID uuid) {
+    if (plugin == null || manager == null || uuid == null) return;
+    FppScheduler.runSync(
+        plugin,
+        () -> {
+          FakePlayer fp = manager.getByUuid(uuid);
+          if (fp == null) return;
+          Player player = fp.getPhysicsEntity();
+          if (player != null && player.isOnline()) player.recalculatePermissions();
+        });
   }
 
   public static CompletableFuture<String> ensureGroupBeforeSpawn(UUID botUuid, String configGroup) {
