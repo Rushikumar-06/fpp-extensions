@@ -184,8 +184,9 @@ public final class FppSkinFetcher implements SkinFetchService {
       Config.debugSkin("SkinFetcher URL error for '" + url + "': " + e.getMessage());
     }
 
-    String[] result = {value, signature};
-    cache.put(cacheKey, result);
+    if (value != null && !value.isBlank()) {
+      cache.put(cacheKey, new String[] {value, signature});
+    }
 
     List<BiConsumer<String, String>> cbs = pending.remove(cacheKey);
     if (cbs != null) {
@@ -363,14 +364,16 @@ public final class FppSkinFetcher implements SkinFetchService {
     String visibility = Config.skinMineSkinVisibility();
     if (visibility == null || visibility.isBlank()) visibility = "public";
     String body =
-        "{\"variant\":\"unknown\",\"name\":null,\"visibility\":\""
+        "{\"variant\":\"classic\",\"name\":null,\"visibility\":\""
             + jsonEscape(visibility.trim().toLowerCase(java.util.Locale.ROOT))
             + "\",\"cape\":null,\"url\":\""
             + jsonEscape(url)
             + "\"}";
 
     try {
-      return postJson("https://api.mineskin.org/v2/generate", body);
+      String response = postJson("https://api.mineskin.org/v2/generate", body);
+      String completedResponse = awaitMineSkinJobIfNeeded(response);
+      return completedResponse != null ? completedResponse : response;
     } catch (Exception first) {
       Config.debugSkin("SkinFetcher: MineSkin v2 URL generate failed: " + first.getMessage());
       return postForm(
@@ -412,6 +415,52 @@ public final class FppSkinFetcher implements SkinFetchService {
       conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
     }
     return sendRequest(conn, body);
+  }
+
+  private static String awaitMineSkinJobIfNeeded(String response) throws Exception {
+    JsonObject json = parseJsonObject(response);
+    if (extractTexturePayload(json) != null) return response;
+
+    String jobId = extractMineSkinJobId(json);
+    if (jobId == null || jobId.isBlank()) return null;
+
+    for (int attempt = 0; attempt < 12; attempt++) {
+      Thread.sleep(1_000L);
+      String status = getMineSkinJson("https://api.mineskin.org/v2/queue/" + jobId);
+      if (extractTexturePayload(parseJsonObject(status)) != null) return status;
+    }
+    return null;
+  }
+
+  private static String getMineSkinJson(String urlStr) throws Exception {
+    HttpURLConnection conn = (HttpURLConnection) URI.create(urlStr).toURL().openConnection();
+    conn.setRequestMethod("GET");
+    conn.setConnectTimeout(10_000);
+    conn.setReadTimeout(30_000);
+    conn.setRequestProperty("User-Agent", MINESKIN_USER_AGENT);
+    conn.setRequestProperty("Accept", "application/json");
+    String apiKey = Config.skinMineSkinApiKey();
+    if (apiKey != null && !apiKey.isBlank()) {
+      conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+    }
+    int code = conn.getResponseCode();
+    if (code == 429) {
+      conn.disconnect();
+      throw new RateLimitException("MineSkin API");
+    }
+    if (code < 200 || code >= 300) {
+      conn.disconnect();
+      throw new IllegalStateException("HTTP " + code);
+    }
+    try (BufferedReader br =
+        new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+      StringBuilder sb = new StringBuilder();
+      String line;
+      while ((line = br.readLine()) != null) sb.append(line);
+      return sb.toString();
+    } finally {
+      conn.disconnect();
+    }
   }
 
   private static String sendRequest(HttpURLConnection conn, String body) throws Exception {
@@ -522,6 +571,32 @@ public final class FppSkinFetcher implements SkinFetchService {
     if (texture != null) {
       String[] nested = extractTexturePayload(texture);
       if (nested != null) return nested;
+    }
+
+    return null;
+  }
+
+  private static String extractMineSkinJobId(JsonObject json) {
+    if (json == null) return null;
+
+    String id = getString(json, "jobId");
+    if (id != null && !id.isBlank()) return id;
+
+    JsonObject job = getObject(json, "job");
+    if (job != null) {
+      id = getString(job, "id");
+      if (id != null && !id.isBlank()) return id;
+      id = getString(job, "jobId");
+      if (id != null && !id.isBlank()) return id;
+    }
+
+    JsonObject links = getObject(json, "links");
+    if (links != null) {
+      String jobLink = getString(links, "job");
+      if (jobLink != null && !jobLink.isBlank()) {
+        int slash = jobLink.lastIndexOf('/');
+        return slash >= 0 ? jobLink.substring(slash + 1) : jobLink;
+      }
     }
 
     return null;

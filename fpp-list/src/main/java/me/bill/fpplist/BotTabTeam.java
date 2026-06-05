@@ -2,8 +2,10 @@ package me.bill.fpplist;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -24,6 +26,7 @@ final class BotTabTeam {
 
   private final Set<String> botEntries = new HashSet<>();
   private final Map<String, String> entryTeams = new HashMap<>();
+  private final Set<Scoreboard> teamCreationFailed = Collections.newSetFromMap(new IdentityHashMap<>());
   private boolean lastPushable = Config.bodyPushable();
 
   void init() {
@@ -40,9 +43,8 @@ final class BotTabTeam {
   void applyCollisionRule() {
     lastPushable = Config.bodyPushable();
     for (Player player : Bukkit.getOnlinePlayers()) {
-      for (Team team : player.getScoreboard().getTeams()) {
-        if (isFppTeam(team.getName())) applyCollisionRuleToTeam(team);
-      }
+      Team team = player.getScoreboard().getTeam(TEAM_NAME);
+      if (team != null) applyCollisionRuleToTeam(team);
     }
   }
 
@@ -97,8 +99,8 @@ final class BotTabTeam {
 
     for (Player player : Bukkit.getOnlinePlayers()) {
       Scoreboard board = player.getScoreboard();
-      for (Team team : new ArrayList<>(board.getTeams())) {
-        if (!isFppTeam(team.getName())) continue;
+      Team team = board.getTeam(TEAM_NAME);
+      if (team != null) {
         for (String existing : new ArrayList<>(team.getEntries())) {
           String desiredTeam = desiredTeams.get(existing);
           if (desiredTeam == null || !desiredTeam.equals(team.getName())) {
@@ -109,8 +111,8 @@ final class BotTabTeam {
       for (String entry : desiredEntries) {
         String teamName = desiredTeams.get(entry);
         removeEntryFromManagedTeams(board, entry, teamName);
-        Team team = ensureTeamExists(player, teamName);
-        if (team != null && !team.hasEntry(entry)) team.addEntry(entry);
+        Team desiredTeam = ensureTeamExists(player, teamName);
+        if (desiredTeam != null && !desiredTeam.hasEntry(entry)) desiredTeam.addEntry(entry);
       }
     }
   }
@@ -125,8 +127,8 @@ final class BotTabTeam {
 
   void destroy() {
     for (Player player : Bukkit.getOnlinePlayers()) {
-      for (Team team : new ArrayList<>(player.getScoreboard().getTeams())) {
-        if (!isFppTeam(team.getName())) continue;
+      Team team = player.getScoreboard().getTeam(TEAM_NAME);
+      if (team != null) {
         try {
           team.unregister();
         } catch (Exception ignored) {
@@ -135,6 +137,7 @@ final class BotTabTeam {
     }
     botEntries.clear();
     entryTeams.clear();
+    teamCreationFailed.clear();
   }
 
   void syncToPlayer(Player player) {
@@ -165,18 +168,26 @@ final class BotTabTeam {
     try {
       Scoreboard board = player.getScoreboard();
       Team team = board.getTeam(teamName);
-      if (team == null) team = board.registerNewTeam(teamName);
-      applyCollisionRuleToTeam(team);
+      if (team == null) {
+        if (teamCreationFailed.contains(board)) return null;
+        team = board.registerNewTeam(teamName);
+        applyCollisionRuleToTeam(team);
+      }
       return team;
     } catch (Exception ignored) {
+      try {
+        teamCreationFailed.add(player.getScoreboard());
+      } catch (Exception ignoredAgain) {
+      }
       return null;
     }
   }
 
   private static void applyCollisionRuleToTeam(Team team) {
-    team.setOption(
-        Team.Option.COLLISION_RULE,
-        Config.bodyPushable() ? Team.OptionStatus.ALWAYS : Team.OptionStatus.NEVER);
+    Team.OptionStatus desired = Config.bodyPushable() ? Team.OptionStatus.ALWAYS : Team.OptionStatus.NEVER;
+    if (team.getOption(Team.Option.COLLISION_RULE) != desired) {
+      team.setOption(Team.Option.COLLISION_RULE, desired);
+    }
   }
 
   private static String teamNameFor(FakePlayer fp) {
@@ -191,17 +202,16 @@ final class BotTabTeam {
   private static void removeEntryFromManagedTeams(
       Scoreboard board, String entry, String exceptTeamName) {
     if (board == null || entry == null) return;
-    for (Team team : new ArrayList<>(board.getTeams())) {
-      if (!isFppTeam(team.getName())) continue;
-      if (exceptTeamName != null && exceptTeamName.equals(team.getName())) continue;
-      if (team.hasEntry(entry)) team.removeEntry(entry);
-    }
+    Team team = board.getTeam(TEAM_NAME);
+    if (team == null) return;
+    if (exceptTeamName != null && exceptTeamName.equals(team.getName())) return;
+    if (team.hasEntry(entry)) team.removeEntry(entry);
   }
 
   private static void clearManagedTeams(Scoreboard board) {
     if (board == null) return;
-    for (Team team : new ArrayList<>(board.getTeams())) {
-      if (!isFppTeam(team.getName())) continue;
+    Team team = board.getTeam(TEAM_NAME);
+    if (team != null) {
       for (String entry : new ArrayList<>(team.getEntries())) {
         team.removeEntry(entry);
       }

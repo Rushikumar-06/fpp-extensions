@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import me.bill.fakePlayerPlugin.FakePlayerPlugin;
 import me.bill.fakePlayerPlugin.api.FppAddonCommand;
 import me.bill.fakePlayerPlugin.api.FppApi;
+import me.bill.fakePlayerPlugin.api.FppBotDisplayService;
 import me.bill.fakePlayerPlugin.api.event.FppBotSpawnEvent;
 import me.bill.fakePlayerPlugin.api.FppExtension;
 import me.bill.fakePlayerPlugin.api.FppBot;
@@ -22,8 +23,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 public final class FppLuckPermsExtension implements FppExtension, Listener {
@@ -31,6 +35,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
   private FakePlayerPlugin core;
   private FppAddonCommand lpInfoCommand;
   private FppAddonCommand rankCommand;
+  private FppBotDisplayService displayService;
 
   @Override
   public @NotNull String getName() {
@@ -39,7 +44,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.0";
+    return "1.0.1";
   }
 
   @Override
@@ -62,6 +67,8 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     core = fpp;
     saveDefaultConfig();
     if (manager() != null) LuckPermsHelper.subscribeLpEvents(core, manager());
+    displayService = new LuckPermsDisplayService();
+    api.registerService(FppBotDisplayService.class, displayService);
     lpInfoCommand = new LpInfoAddonCommand();
     rankCommand = new RankAddonCommand();
     api.registerCommand(lpInfoCommand);
@@ -75,9 +82,11 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     if (api != null) {
       if (lpInfoCommand != null) api.unregisterCommand(lpInfoCommand);
       if (rankCommand != null) api.unregisterCommand(rankCommand);
+      if (displayService != null) api.unregisterService(FppBotDisplayService.class, displayService);
     }
     HandlerList.unregisterAll(this);
     LuckPermsHelper.unsubscribeLpEvents();
+    displayService = null;
     rankCommand = null;
     lpInfoCommand = null;
     core = null;
@@ -100,13 +109,35 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     return core != null ? core.getFakePlayerManager() : null;
   }
 
+  @EventHandler(priority = EventPriority.LOWEST)
+  public void onBotJoinPrepareLuckPerms(PlayerJoinEvent event) {
+    if (!enabled() || !LuckPermsHelper.isAvailable()) return;
+    FakePlayerManager manager = manager();
+    if (manager == null) return;
+    FakePlayer bot = manager.getByUuid(event.getPlayer().getUniqueId());
+    if (bot == null) return;
+
+    String group = LuckPermsHelper.prepareOnlineBotUser(bot.getUuid(), defaultGroup());
+    if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
+  }
+
+  @EventHandler(priority = EventPriority.LOWEST)
+  public void onBotQuitPrepareLuckPerms(PlayerQuitEvent event) {
+    if (!enabled() || !LuckPermsHelper.isAvailable()) return;
+    FakePlayerManager manager = manager();
+    if (manager == null) return;
+    FakePlayer bot = manager.getByUuid(event.getPlayer().getUniqueId());
+    if (bot == null) return;
+    LuckPermsHelper.refreshUserCache(bot.getUuid());
+  }
+
   @EventHandler
   public void onBotSpawn(FppBotSpawnEvent event) {
     if (!enabled() || !LuckPermsHelper.isAvailable()) return;
     String defaultGroup = defaultGroup();
 
     FppBot apiBot = event.getBot();
-    if (apiBot == null || apiBot.hasMetadata("fpp.explicit-uuid-spawn")) return;
+    if (apiBot.hasMetadata("fpp.explicit-uuid-spawn")) return;
 
     if (defaultGroup == null || defaultGroup.isBlank()) {
       LuckPermsHelper.getStoredPrimaryGroup(apiBot.getUuid())
@@ -125,13 +156,22 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
           FakePlayerManager manager = manager();
           FakePlayer bot = manager != null ? manager.getByUuid(uuid) : null;
           if (bot == null) return;
-          if (group != null && !group.isBlank()) {
-            bot.setLuckpermsGroup(group);
-            manager.refreshDisplayName(bot);
-          }
+          if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
+          manager.refreshDisplayName(bot);
           manager.persistBotSettings(bot);
-          core.getLogger().fine("[FPP-LuckPerms] Set group '" + group + "' for bot " + bot.getName());
         });
+  }
+
+  private static final class LuckPermsDisplayService implements FppBotDisplayService {
+    @Override
+    public @NotNull String decorateDisplayName(@NotNull FppBot bot, @NotNull String displayName) {
+      String prefix = LuckPermsHelper.getResolvedPrefix(bot.getUuid());
+      String suffix = LuckPermsHelper.getResolvedSuffix(bot.getUuid());
+      if ((prefix == null || prefix.isBlank()) && (suffix == null || suffix.isBlank())) {
+        return displayName;
+      }
+      return (prefix != null ? prefix : "") + displayName + (suffix != null ? suffix : "");
+    }
   }
 
   private final class LpInfoAddonCommand implements FppAddonCommand {

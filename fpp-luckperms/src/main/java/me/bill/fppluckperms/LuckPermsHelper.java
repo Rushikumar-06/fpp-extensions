@@ -2,6 +2,7 @@ package me.bill.fppluckperms;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import me.bill.fakePlayerPlugin.FakePlayerPlugin;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayer;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayerManager;
@@ -21,6 +22,8 @@ import org.bukkit.plugin.Plugin;
 public final class LuckPermsHelper {
 
   private static EventSubscription<UserDataRecalculateEvent> eventSub;
+  private static final Set<UUID> pendingDisplayRefreshes = Collections.synchronizedSet(new LinkedHashSet<>());
+  private static volatile boolean displayRefreshTaskQueued = false;
 
   private LuckPermsHelper() {}
 
@@ -69,7 +72,7 @@ public final class LuckPermsHelper {
                     }
                     if (newGroup == null) newGroup = "default";
                     fp.setLuckpermsGroup(newGroup);
-                    FppScheduler.runSync(plugin, () -> manager.refreshDisplayName(fp));
+                    queueDisplayRefresh(plugin, manager, uuid);
                     debug(
                         "UserDataRecalculate for bot '"
                             + fp.getName()
@@ -93,6 +96,43 @@ public final class LuckPermsHelper {
       }
       eventSub = null;
     }
+    pendingDisplayRefreshes.clear();
+    displayRefreshTaskQueued = false;
+  }
+
+  private static void queueDisplayRefresh(FakePlayerPlugin plugin, FakePlayerManager manager, UUID uuid) {
+    if (plugin == null || manager == null || uuid == null) return;
+    pendingDisplayRefreshes.add(uuid);
+    if (displayRefreshTaskQueued) return;
+    displayRefreshTaskQueued = true;
+    FppScheduler.runSyncLater(plugin, () -> processDisplayRefreshQueue(plugin, manager), 2L);
+  }
+
+  private static void processDisplayRefreshQueue(FakePlayerPlugin plugin, FakePlayerManager manager) {
+    int processed = 0;
+    while (processed < 3) {
+      UUID uuid = pollPendingDisplayRefresh();
+      if (uuid == null) break;
+      FakePlayer fp = manager.getByUuid(uuid);
+      if (fp != null) manager.refreshDisplayName(fp);
+      processed++;
+    }
+
+    if (pendingDisplayRefreshes.isEmpty()) {
+      displayRefreshTaskQueued = false;
+      return;
+    }
+    FppScheduler.runSyncLater(plugin, () -> processDisplayRefreshQueue(plugin, manager), 1L);
+  }
+
+  private static UUID pollPendingDisplayRefresh() {
+    synchronized (pendingDisplayRefreshes) {
+      Iterator<UUID> iterator = pendingDisplayRefreshes.iterator();
+      if (!iterator.hasNext()) return null;
+      UUID uuid = iterator.next();
+      iterator.remove();
+      return uuid;
+    }
   }
 
   public static CompletableFuture<String> ensureGroupBeforeSpawn(UUID botUuid, String configGroup) {
@@ -114,9 +154,7 @@ public final class LuckPermsHelper {
                   storedPrimary != null
                       && !storedPrimary.equalsIgnoreCase("default")
                       && !storedPrimary.isBlank();
-              boolean configForcesGroup = configGroup != null && !configGroup.trim().isEmpty();
-
-              if (hasExplicitGroup && !configForcesGroup) {
+              if (hasExplicitGroup) {
 
                 debug(
                     "ensureGroupBeforeSpawn: keeping stored group '"
@@ -152,6 +190,38 @@ public final class LuckPermsHelper {
                   "[LP] ensureGroupBeforeSpawn error for " + botUuid + ": " + ex.getMessage());
               return targetGroup;
             });
+  }
+
+  public static String prepareOnlineBotUser(UUID botUuid, String configGroup) {
+    LuckPerms api = lp();
+    if (api == null) return "default";
+
+    String targetGroup =
+        (configGroup != null && !configGroup.trim().isEmpty()) ? configGroup.trim() : "default";
+    try {
+      User user = api.getUserManager().loadUser(botUuid).get(2, TimeUnit.SECONDS);
+      if (user == null) return targetGroup;
+
+      String storedPrimary = user.getPrimaryGroup();
+      boolean hasExplicitGroup =
+          storedPrimary != null
+              && !storedPrimary.equalsIgnoreCase("default")
+              && !storedPrimary.isBlank();
+      String group = hasExplicitGroup ? storedPrimary : targetGroup;
+
+      if (!hasExplicitGroup) {
+        user.data().clear(NodeType.INHERITANCE::matches);
+        user.data().add(InheritanceNode.builder(group).build());
+        user.setPrimaryGroup(group);
+        api.getUserManager().saveUser(user).get(2, TimeUnit.SECONDS);
+      }
+
+      user.getCachedData().invalidate();
+      return group;
+    } catch (Exception e) {
+      FppLogger.warn("[LP] prepareOnlineBotUser error for " + botUuid + ": " + e.getMessage());
+      return targetGroup;
+    }
   }
 
   public static CompletableFuture<Void> applyGroupToOnlineUser(UUID botUuid, String groupName) {

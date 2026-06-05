@@ -33,7 +33,7 @@ public final class FppChatExtension implements FppExtension {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.0";
+    return "1.0.1";
   }
 
   @Override
@@ -55,8 +55,6 @@ public final class FppChatExtension implements FppExtension {
     }
     this.core = fpp;
     saveDefaultConfig();
-    getConfig().options().copyDefaults(true);
-    saveConfig();
     Config.registerExternalConfig("fake-chat", getConfig());
     migrateLegacyBotMessages();
     botMessages = new BotMessageConfig(this);
@@ -66,9 +64,7 @@ public final class FppChatExtension implements FppExtension {
     core.setBotChatAI(chatAI);
     command = new ChatAddonCommand();
     api.registerCommand(command);
-    
-    boolean chatEnabled = getConfig().getBoolean("fake-chat.enabled", true);
-    api.getPlugin().getLogger().info("[FPP-Chat] Enabled (fake-chat.enabled=" + chatEnabled + ").");
+    api.getPlugin().getLogger().info("[FPP-Chat] Enabled.");
   }
 
   @Override
@@ -140,8 +136,7 @@ public final class FppChatExtension implements FppExtension {
     Config.registerExternalConfig("fake-chat", getConfig());
     BotChatAI chatAI = chatAI();
     if (chatAI == null) return;
-    boolean enabled = getConfig().getBoolean("fake-chat.enabled", true);
-    if (enabled) chatAI.restartLoops();
+    if (Config.fakeChatEnabled()) chatAI.restartLoops();
     else chatAI.cancelAll();
   }
 
@@ -220,6 +215,7 @@ public final class FppChatExtension implements FppExtension {
 
       if (args.length < 2) {
         boolean enable = !bot.isChatEnabled();
+        if (enable) ensureGlobalEnabled(sender);
         bot.setChatEnabled(enable);
         sender.sendMessage(
             Lang.get(enable ? "chat-bot-enabled" : "chat-bot-disabled", "name", bot.getDisplayName()));
@@ -235,9 +231,13 @@ public final class FppChatExtension implements FppExtension {
                 bot.isChatEnabled() ? "chat-bot-status-on" : "chat-bot-status-off",
                 "name",
                 bot.getDisplayName()));
+        if (bot.isChatEnabled() && !Config.fakeChatEnabled()) {
+          sender.sendMessage(Lang.get("chat-status-off"));
+        }
         return true;
       }
       if (sub.equals("on") || sub.equals("true") || sub.equals("1")) {
+        ensureGlobalEnabled(sender);
         bot.setChatEnabled(true);
         sender.sendMessage(Lang.get("chat-bot-enabled", "name", bot.getDisplayName()));
         manager.persistBotSettings(bot);
@@ -332,6 +332,11 @@ public final class FppChatExtension implements FppExtension {
       Config.debug("fake-chat.enabled set to " + enabled + " by " + sender.getName());
     }
 
+    private void ensureGlobalEnabled(CommandSender sender) {
+      if (Config.fakeChatEnabled()) return;
+      setGlobal(sender, true);
+    }
+
     private void handleAll(CommandSender sender, FakePlayerManager manager, String[] args) {
       if (manager == null) {
         sender.sendMessage(Lang.get("chat-invalid"));
@@ -344,6 +349,7 @@ public final class FppChatExtension implements FppExtension {
       String sub = args[1].toLowerCase();
       switch (sub) {
         case "on", "true" -> {
+          ensureGlobalEnabled(sender);
           manager.getActivePlayers().forEach(fp -> fp.setChatEnabled(true));
           sender.sendMessage(Lang.get("chat-all-enabled", "count", String.valueOf(manager.getActivePlayers().size())));
           manager.getActivePlayers().forEach(manager::persistBotSettings);
@@ -363,6 +369,9 @@ public final class FppChatExtension implements FppExtension {
                   String.valueOf(enabled),
                   "disabled",
                   String.valueOf(disabled)));
+          if (enabled > 0 && !Config.fakeChatEnabled()) {
+            sender.sendMessage(Lang.get("chat-status-off"));
+          }
         }
         case "say" -> {
           if (args.length < 3) {

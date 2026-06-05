@@ -35,7 +35,7 @@ public final class FppListExtension implements FppExtension, Listener {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.0";
+    return "1.0.1";
   }
 
   @Override
@@ -113,7 +113,6 @@ public final class FppListExtension implements FppExtension, Listener {
   @EventHandler(priority = EventPriority.MONITOR)
   public void onBotSpawn(FppBotSpawnEvent event) {
     if (tabTeam == null || manager == null || core == null) return;
-    if (!getConfig().getBoolean("bot-tab-list.enabled", true)) return;
     FppScheduler.runSyncLater(
         core,
         () -> {
@@ -126,7 +125,6 @@ public final class FppListExtension implements FppExtension, Listener {
   @EventHandler(priority = EventPriority.MONITOR)
   public void onBotDespawn(FppBotDespawnEvent event) {
     if (tabTeam == null || manager == null) return;
-    if (!getConfig().getBoolean("bot-tab-list.enabled", true)) return;
     FakePlayer fp = manager.getByUuid(event.getBot().getUuid());
     if (fp != null) tabTeam.removeBot(fp);
     else tabTeam.removeEntry(event.getBot().getName());
@@ -135,7 +133,6 @@ public final class FppListExtension implements FppExtension, Listener {
   @EventHandler(priority = EventPriority.MONITOR)
   public void onPlayerJoin(PlayerJoinEvent event) {
     if (tabTeam == null || manager == null || core == null) return;
-    if (!getConfig().getBoolean("bot-tab-list.enabled", true)) return;
     long delay = manager.isRestorationInProgress() ? 40L : 5L;
     FppScheduler.runSyncLater(core, () -> tabTeam.syncToPlayer(event.getPlayer()), delay);
   }
