@@ -30,55 +30,57 @@ public final class AIProviderRegistry {
   private void loadProviders() {
     File secretsFile = new File(dataFolder, "secrets.yml");
     FileConfiguration secrets = YamlConfiguration.loadConfiguration(secretsFile);
+    File modelsFile = new File(dataFolder, "models.yml");
+    FileConfiguration models = YamlConfiguration.loadConfiguration(modelsFile);
 
     String openaiKey = secrets.getString("openai.api-key", "");
-    String openaiEndpoint = secrets.getString("openai.endpoint", "");
-    String openaiModel = secrets.getString("openai.model", "");
+    String openaiEndpoint = modelString(models, secrets, "openai.endpoint", "");
+    String openaiModel = modelString(models, secrets, "openai.model", "");
     if (!openaiKey.isBlank()) {
       providers.add(new OpenAIProvider(openaiKey, openaiEndpoint, openaiModel));
     }
 
     String groqKey = secrets.getString("groq.api-key", "");
-    String groqEndpoint = secrets.getString("groq.endpoint", "");
-    String groqModel = secrets.getString("groq.model", "");
+    String groqEndpoint = modelString(models, secrets, "groq.endpoint", "");
+    String groqModel = modelString(models, secrets, "groq.model", "");
     if (!groqKey.isBlank()) {
       providers.add(new GroqProvider(groqKey, groqEndpoint, groqModel));
     }
 
     String anthropicKey = secrets.getString("anthropic.api-key", "");
-    String anthropicEndpoint = secrets.getString("anthropic.endpoint", "");
-    String anthropicModel = secrets.getString("anthropic.model", "");
+    String anthropicEndpoint = modelString(models, secrets, "anthropic.endpoint", "");
+    String anthropicModel = modelString(models, secrets, "anthropic.model", "");
     if (!anthropicKey.isBlank()) {
       providers.add(new AnthropicProvider(anthropicKey, anthropicEndpoint, anthropicModel));
     }
 
     String googleKey = secrets.getString("google.api-key", "");
-    String googleEndpoint = secrets.getString("google.endpoint", "");
-    String googleModel = secrets.getString("google.model", "");
+    String googleEndpoint = modelString(models, secrets, "google.endpoint", "");
+    String googleModel = modelString(models, secrets, "google.model", "");
     if (!googleKey.isBlank()) {
       providers.add(new GoogleGeminiProvider(googleKey, googleEndpoint, googleModel));
     }
 
-    boolean ollamaEnabled = secrets.getBoolean("ollama.enabled", false);
-    String ollamaEndpoint = secrets.getString("ollama.endpoint", "http://localhost:11434");
-    String ollamaModel = secrets.getString("ollama.model", "");
+    boolean ollamaEnabled = modelBoolean(models, secrets, "ollama.enabled", false);
+    String ollamaEndpoint = modelString(models, secrets, "ollama.endpoint", "http://localhost:11434");
+    String ollamaModel = modelString(models, secrets, "ollama.model", "");
     if (ollamaEnabled) {
       providers.add(new OllamaProvider(ollamaEndpoint, ollamaModel));
     }
 
     String copilotKey = secrets.getString("copilot.api-key", "");
-    String copilotEndpoint = secrets.getString("copilot.endpoint", "");
-    String copilotDeployment = secrets.getString("copilot.deployment-name", "");
-    String copilotModel = secrets.getString("copilot.model", "");
+    String copilotEndpoint = modelString(models, secrets, "copilot.endpoint", "");
+    String copilotDeployment = modelString(models, secrets, "copilot.deployment-name", "");
+    String copilotModel = modelString(models, secrets, "copilot.model", "");
     if (!copilotKey.isBlank() && !copilotEndpoint.isBlank()) {
       providers.add(
           new CopilotProvider(copilotKey, copilotEndpoint, copilotDeployment, copilotModel));
     }
 
-    boolean customEnabled = secrets.getBoolean("custom.enabled", false);
+    boolean customEnabled = modelBoolean(models, secrets, "custom.enabled", false);
     String customKey = secrets.getString("custom.api-key", "");
-    String customEndpoint = secrets.getString("custom.endpoint", "");
-    String customModel = secrets.getString("custom.model", "");
+    String customEndpoint = modelString(models, secrets, "custom.endpoint", "");
+    String customModel = modelString(models, secrets, "custom.model", "");
     if (customEnabled && !customEndpoint.isBlank()) {
       providers.add(new CustomOpenAIProvider(customKey, customEndpoint, customModel));
     }
@@ -113,5 +115,21 @@ public final class AIProviderRegistry {
       return CompletableFuture.failedFuture(new IllegalStateException("No AI provider configured"));
     }
     return activeProvider.generateResponse(messages, botName, personality);
+  }
+
+  private String modelString(
+      FileConfiguration models, FileConfiguration secrets, String path, String fallback) {
+    if (models.contains(path)) {
+      return models.getString(path, fallback);
+    }
+    return secrets.getString(path, fallback);
+  }
+
+  private boolean modelBoolean(
+      FileConfiguration models, FileConfiguration secrets, String path, boolean fallback) {
+    if (models.contains(path)) {
+      return models.getBoolean(path, fallback);
+    }
+    return secrets.getBoolean(path, fallback);
   }
 }

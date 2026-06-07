@@ -45,7 +45,7 @@ public final class FppAiChatExtension implements FppExtension, Listener {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.1";
+    return "1.1.1";
   }
 
   @Override
