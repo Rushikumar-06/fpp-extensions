@@ -376,8 +376,8 @@ public final class BotSwapAI implements BotSwapController {
       sendBotChat(fp, randomFrom(FAREWELLS));
     }
 
-    int leaveMin = Config.leaveDelayMin();
-    int leaveMax = Math.max(leaveMin, Config.leaveDelayMax());
+    int leaveMin = leaveDelayMin();
+    int leaveMax = Math.max(leaveMin, leaveDelayMax());
     long leaveDelayTicks;
     if (leaveMax <= 0) {
       leaveDelayTicks = 0L;
@@ -407,7 +407,7 @@ public final class BotSwapAI implements BotSwapController {
                   absMin
                       + (absMax > absMin ? ThreadLocalRandom.current().nextInt(absMax - absMin + 1) : 0);
               long absenceTicks = Math.max(40L, (long) absSec * 20L);
-              long leaveBuffer = (long) Math.max(Config.leaveDelayMin(), Config.leaveDelayMax()) + 10L;
+              long leaveBuffer = (long) Math.max(leaveDelayMin(), leaveDelayMax()) + 10L;
               long totalRejoinDelay = absenceTicks + leaveBuffer;
 
               int rid =
@@ -452,6 +452,14 @@ public final class BotSwapAI implements BotSwapController {
             preDeleteDelay);
 
     packingTimers.put(leavingUuid, packingId);
+  }
+
+  private int leaveDelayMin() {
+    return 0;
+  }
+
+  private int leaveDelayMax() {
+    return 0;
   }
 
   private void doRejoin(

@@ -2,6 +2,7 @@ package me.bill.fppluckperms;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import me.bill.fakePlayerPlugin.FakePlayerPlugin;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayer;
@@ -10,6 +11,7 @@ import me.bill.fakePlayerPlugin.util.FppLogger;
 import me.bill.fakePlayerPlugin.util.FppScheduler;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.cacheddata.CachedPermissionData;
 import net.luckperms.api.event.EventSubscription;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.group.Group;
@@ -18,13 +20,18 @@ import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.plugin.Plugin;
 
 public final class LuckPermsHelper {
 
   private static EventSubscription<UserDataRecalculateEvent> eventSub;
   private static final Set<UUID> pendingDisplayRefreshes = Collections.synchronizedSet(new LinkedHashSet<>());
+  private static final Set<UUID> pendingPermissionRefreshes = Collections.synchronizedSet(new LinkedHashSet<>());
+  private static final Map<UUID, PermissionAttachment> permissionAttachments = new ConcurrentHashMap<>();
+  private static final Map<UUID, Map<String, Boolean>> lastAppliedPermissions = new ConcurrentHashMap<>();
   private static volatile boolean displayRefreshTaskQueued = false;
+  private static volatile boolean permissionRefreshTaskQueued = false;
 
   private LuckPermsHelper() {}
 
@@ -99,7 +106,10 @@ public final class LuckPermsHelper {
       eventSub = null;
     }
     pendingDisplayRefreshes.clear();
+    pendingPermissionRefreshes.clear();
     displayRefreshTaskQueued = false;
+    permissionRefreshTaskQueued = false;
+    clearPermissionAttachments();
   }
 
   private static void queueDisplayRefresh(FakePlayerPlugin plugin, FakePlayerManager manager, UUID uuid) {
@@ -140,14 +150,81 @@ public final class LuckPermsHelper {
   public static void queuePermissionRefresh(
       FakePlayerPlugin plugin, FakePlayerManager manager, UUID uuid) {
     if (plugin == null || manager == null || uuid == null) return;
-    FppScheduler.runSync(
-        plugin,
-        () -> {
-          FakePlayer fp = manager.getByUuid(uuid);
-          if (fp == null) return;
-          Player player = fp.getPhysicsEntity();
-          if (player != null && player.isOnline()) player.recalculatePermissions();
-        });
+    pendingPermissionRefreshes.add(uuid);
+    if (permissionRefreshTaskQueued) return;
+    permissionRefreshTaskQueued = true;
+    FppScheduler.runSyncLater(plugin, () -> processPermissionRefreshQueue(plugin, manager), 5L);
+  }
+
+  private static void processPermissionRefreshQueue(FakePlayerPlugin plugin, FakePlayerManager manager) {
+    int processed = 0;
+    while (processed < 2) {
+      UUID uuid = pollPendingPermissionRefresh();
+      if (uuid == null) break;
+      FakePlayer fp = manager.getByUuid(uuid);
+      if (fp != null) {
+        Player player = fp.getPhysicsEntity();
+        if (player != null && player.isOnline()) applyPermissionAttachment(plugin, uuid, player);
+      }
+      processed++;
+    }
+
+    if (pendingPermissionRefreshes.isEmpty()) {
+      permissionRefreshTaskQueued = false;
+      return;
+    }
+    FppScheduler.runSyncLater(plugin, () -> processPermissionRefreshQueue(plugin, manager), 2L);
+  }
+
+  private static UUID pollPendingPermissionRefresh() {
+    synchronized (pendingPermissionRefreshes) {
+      Iterator<UUID> iterator = pendingPermissionRefreshes.iterator();
+      if (!iterator.hasNext()) return null;
+      UUID uuid = iterator.next();
+      iterator.remove();
+      return uuid;
+    }
+  }
+
+  public static void clearPermissionAttachment(UUID uuid) {
+    if (uuid == null) return;
+    PermissionAttachment attachment = permissionAttachments.remove(uuid);
+    if (attachment == null) return;
+    try {
+      attachment.remove();
+    } catch (IllegalArgumentException ignored) {
+    }
+    lastAppliedPermissions.remove(uuid);
+  }
+
+  private static void clearPermissionAttachments() {
+    for (UUID uuid : new ArrayList<>(permissionAttachments.keySet())) {
+      clearPermissionAttachment(uuid);
+    }
+  }
+
+  private static void applyPermissionAttachment(FakePlayerPlugin plugin, UUID uuid, Player player) {
+    LuckPerms api = lp();
+    if (api == null) return;
+    User user = api.getUserManager().getUser(uuid);
+    if (user == null) return;
+
+    clearPermissionAttachment(uuid);
+    CachedPermissionData permissionData = user.getCachedData().getPermissionData();
+    Map<String, Boolean> permissions = new LinkedHashMap<>();
+    permissionData.getPermissionMap().forEach((permission, value) -> {
+      if (permission != null && !permission.isBlank() && value != null) {
+        permissions.put(permission, value);
+      }
+    });
+    if (permissions.equals(lastAppliedPermissions.get(uuid))) return;
+
+    PermissionAttachment attachment = player.addAttachment(plugin);
+    permissionAttachments.put(uuid, attachment);
+    for (Map.Entry<String, Boolean> entry : permissions.entrySet()) {
+      attachment.setPermission(entry.getKey(), entry.getValue());
+    }
+    lastAppliedPermissions.put(uuid, permissions);
   }
 
   public static CompletableFuture<String> ensureGroupBeforeSpawn(UUID botUuid, String configGroup) {

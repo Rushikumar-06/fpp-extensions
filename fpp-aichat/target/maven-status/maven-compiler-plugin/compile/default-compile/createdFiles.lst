@@ -1,0 +1,14 @@
+me\bill\fppaichat\ai\AIProviderRegistry.class
+me\bill\fppaichat\ai\OllamaProvider.class
+me\bill\fppaichat\ai\GoogleGeminiProvider.class
+me\bill\fppaichat\ai\GroqProvider.class
+me\bill\fppaichat\FppAiChatExtension$PersonalityAddonCommand.class
+me\bill\fppaichat\ai\AIProvider.class
+me\bill\fppaichat\ai\CopilotProvider.class
+me\bill\fppaichat\ai\OpenAIProvider.class
+me\bill\fppaichat\ai\AnthropicProvider.class
+me\bill\fppaichat\ai\BotConversationManager.class
+me\bill\fppaichat\ai\PersonalityRepository.class
+me\bill\fppaichat\ai\AIProvider$ChatMessage.class
+me\bill\fppaichat\ai\CustomOpenAIProvider.class
+me\bill\fppaichat\FppAiChatExtension.class

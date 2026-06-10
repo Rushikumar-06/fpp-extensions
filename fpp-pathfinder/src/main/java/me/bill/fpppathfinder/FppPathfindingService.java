@@ -28,7 +28,7 @@ public final class FppPathfindingService implements PathfindingService.Controlle
 
   private static final int MAX_PATH_RECALCS_PER_SLICE = 4;
 
-  private record Session(Owner owner, int taskId) {}
+  private record Session(Owner owner, int taskId, boolean followMode) {}
 
   private final FakePlayerPlugin plugin;
   private final FakePlayerManager manager;
@@ -53,6 +53,11 @@ public final class FppPathfindingService implements PathfindingService.Controlle
   public boolean isNavigating(@NotNull UUID botUuid, @NotNull Owner owner) {
     Session session = sessions.get(botUuid);
     return session != null && session.owner() == owner;
+  }
+
+  public boolean isFollowing(@NotNull UUID botUuid) {
+    Session session = sessions.get(botUuid);
+    return session != null && session.followMode();
   }
 
   @Nullable
@@ -91,6 +96,14 @@ public final class FppPathfindingService implements PathfindingService.Controlle
   }
 
   public void navigate(@NotNull FakePlayer fp, @NotNull NavigationRequest request) {
+    navigate(fp, request, false);
+  }
+
+  public void navigateFollow(@NotNull FakePlayer fp, @NotNull NavigationRequest request) {
+    navigate(fp, request, true);
+  }
+
+  private void navigate(@NotNull FakePlayer fp, @NotNull NavigationRequest request, boolean followMode) {
     UUID botUuid = fp.getUuid();
     cancel(botUuid);
     manager.lockForNavigation(botUuid);
@@ -119,11 +132,11 @@ public final class FppPathfindingService implements PathfindingService.Controlle
     final int[] wpIdx = {0};
     final Location[] lastCalc = {initialDest.clone()};
     final int recalcInterval =
-        request.owner() == Owner.FOLLOW
+        followMode
             ? Config.pathfindingFollowRecalcInterval()
             : Config.pathfindingRecalcInterval();
     final int initialRecalcDelay =
-        request.owner() == Owner.FOLLOW
+        followMode
             ? Math.floorMod(botUuid.hashCode(), Math.min(recalcInterval, 20))
             : 0;
     final int[] recalcIn = {initialRecalcDelay};
@@ -205,12 +218,12 @@ public final class FppPathfindingService implements PathfindingService.Controlle
             double dx0 = botLoc.getX() - dest.getX();
             double dz0 = botLoc.getZ() - dest.getZ();
             double distToTargetSq = dx0 * dx0 + dz0 * dz0;
-            if (distToTargetSq <= arrivalSq && request.owner() != Owner.FOLLOW) {
+            if (distToTargetSq <= arrivalSq && !followMode) {
               cleanup(bot, true, false);
               return;
             }
 
-            boolean closeFollow = request.owner() == Owner.FOLLOW && distToTargetSq <= arrivalSq;
+            boolean closeFollow = followMode && distToTargetSq <= arrivalSq;
 
             boolean targetMoved = false;
             if (request.recalcDistance() > 0 && lastCalc[0] != null) {
@@ -255,7 +268,7 @@ public final class FppPathfindingService implements PathfindingService.Controlle
               int destX = dest.getBlockX();
               int destY = dest.getBlockY();
               int destZ = dest.getBlockZ();
-              if (request.owner() == Owner.FOLLOW && (bot.isInWater() || bot.isInLava()) && destY < botLoc.getBlockY()) {
+              if (followMode && (bot.isInWater() || bot.isInLava()) && destY < botLoc.getBlockY()) {
                 destY = botLoc.getBlockY();
               }
 
@@ -299,7 +312,7 @@ public final class FppPathfindingService implements PathfindingService.Controlle
               List<BotPathfinder.Move> path = pathRef[0];
               if (path == null || path.isEmpty() || wpIdx[0] >= path.size()) {
                 Location walkDest = dest;
-                if (request.owner() == Owner.FOLLOW && (bot.isInWater() || bot.isInLava()) && dest.getY() < botLoc.getY()) {
+                if (followMode && (bot.isInWater() || bot.isInLava()) && dest.getY() < botLoc.getY()) {
                   walkDest = dest.clone();
                   walkDest.setY(botLoc.getY());
                 }
@@ -630,7 +643,7 @@ public final class FppPathfindingService implements PathfindingService.Controlle
 
     int taskId = FppScheduler.runAtEntityRepeatingWithId(plugin, initialBot, tick, 0L, 1L);
     taskIdRef[0] = taskId;
-    sessions.put(botUuid, new Session(request.owner(), taskId));
+    sessions.put(botUuid, new Session(request.owner(), taskId, followMode));
   }
 
   private synchronized boolean tryAcquireRecalcSlot() {

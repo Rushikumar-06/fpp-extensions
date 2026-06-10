@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="maven-antrun-" default="main">
+  <target name="main">
+    <mkdir dir="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-luckperms/../../builds" />
+    <copy file="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-luckperms\target/fpp-luckperms.jar" tofile="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-luckperms/../../builds/fpp-luckperms.jar" overwrite="true" />
+    <echo message="[FPP-LuckPerms] Build output: D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-luckperms/../../builds/fpp-luckperms.jar" />
+  </target>
+</project>

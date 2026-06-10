@@ -7,12 +7,7 @@ java {
 }
 
 group = "me.bill"
-    version = "1.1.0"
-
-repositories {
-    mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
-}
+    version = "1.1.1"
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
@@ -29,13 +24,4 @@ tasks.processResources {
 tasks.jar {
     archiveBaseName.set("fpp-luckperms")
     archiveVersion.set("")
-}
-
-tasks.register<Copy>("copyExtension") {
-    from(tasks.jar)
-    into("../../fake-player-plugin/build/extensions")
-}
-
-tasks.build {
-    finalizedBy("copyExtension")
 }

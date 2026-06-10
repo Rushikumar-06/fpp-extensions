@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import me.bill.fakePlayerPlugin.FakePlayerPlugin;
 import me.bill.fakePlayerPlugin.api.FppApi;
 import me.bill.fakePlayerPlugin.api.FppBot;
@@ -13,8 +14,11 @@ import me.bill.fakePlayerPlugin.api.FppSettingsItem;
 import me.bill.fakePlayerPlugin.api.FppSettingsTab;
 import me.bill.fakePlayerPlugin.config.Config;
 import me.bill.fakePlayerPlugin.fakeplayer.FakePlayer;
+import me.bill.fakePlayerPlugin.fakeplayer.PathfindingService.NavigationRequest;
+import me.bill.fakePlayerPlugin.fakeplayer.PathfindingService.Owner;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -33,7 +37,7 @@ public final class FppPathfinderExtension implements FppExtension {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.1";
+    return "1.1.1";
   }
 
   @Override
@@ -203,18 +207,32 @@ public final class FppPathfinderExtension implements FppExtension {
   }
 
   private boolean isFollowing(FppBot bot) {
-    return core != null && core.getFollowCommand() != null && core.getFollowCommand().isFollowing(bot.getUuid());
+    return service != null && service.isFollowing(bot.getUuid());
   }
 
   private void toggleFollow(Player viewer, FppBot bot) {
-    if (core == null || core.getFollowCommand() == null) return;
+    if (core == null || service == null) return;
     if (isFollowing(bot)) {
-      core.getFollowCommand().stopFollowing(bot.getUuid());
+      service.cancel(bot.getUuid());
       return;
     }
     FakePlayer fp = core.getFakePlayerManager().getByUuid(bot.getUuid());
     if (fp != null && fp.getPlayer() != null && fp.getPlayer().getWorld().equals(viewer.getWorld())) {
-      core.getFollowCommand().startFollowingFromSettings(fp, viewer);
+      UUID targetUuid = viewer.getUniqueId();
+      service.navigateFollow(
+          fp,
+          new NavigationRequest(
+              Owner.MOVE,
+              () -> {
+                Player target = Bukkit.getPlayer(targetUuid);
+                return target != null && target.isOnline() ? target.getLocation() : null;
+              },
+              getConfig().getDouble("pathfinding.follow-distance", 2.0),
+              getConfig().getDouble("pathfinding.follow-recalc-distance", 3.5),
+              Integer.MAX_VALUE,
+              null,
+              null,
+              null));
     } else {
       viewer.sendActionBar(Component.text("Bot must be online in your world.", NamedTextColor.RED));
     }

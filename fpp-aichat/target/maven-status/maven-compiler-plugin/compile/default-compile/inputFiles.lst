@@ -1,0 +1,12 @@
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\AIProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\AIProviderRegistry.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\AnthropicProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\BotConversationManager.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\CopilotProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\CustomOpenAIProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\GoogleGeminiProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\GroqProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\OllamaProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\OpenAIProvider.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\ai\PersonalityRepository.java
+D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\src\main\java\me\bill\fppaichat\FppAiChatExtension.java

@@ -2,27 +2,47 @@ package me.bill.fppping;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import me.bill.fakePlayerPlugin.api.FppAddonCommand;
 import me.bill.fakePlayerPlugin.api.FppApi;
 import me.bill.fakePlayerPlugin.api.FppBot;
+import me.bill.fakePlayerPlugin.api.FppBotTickHandler;
 import me.bill.fakePlayerPlugin.api.FppExtension;
 import me.bill.fakePlayerPlugin.config.Config;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 public final class FppPingExtension implements FppExtension {
   private FppApi api;
   private Plugin plugin;
   private FppAddonCommand command;
+  private final Map<UUID, FreezeState> frozenBots = new HashMap<>();
+  private final Map<UUID, KnockbackState> pendingKnockback = new HashMap<>();
+  private final Map<UUID, Location> lastStableLocations = new HashMap<>();
+  private final FppBotTickHandler tickHandler = this::onBotTick;
+  private Listener listener;
+  private long tickCounter;
 
   @Override
   public @NotNull String getName() {
@@ -31,12 +51,12 @@ public final class FppPingExtension implements FppExtension {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.1";
+    return "1.1.1";
   }
 
   @Override
   public @NotNull String getDescription() {
-    return "Adds the /fpp ping command as a FakePlayerPlugin extension.";
+    return "Adds bot ping spoofing and fake-lag controls as a FakePlayerPlugin extension.";
   }
 
   @Override
@@ -52,13 +72,22 @@ public final class FppPingExtension implements FppExtension {
     Config.registerExternalConfig("ping", getConfig());
     command = new PingAddonCommand();
     api.registerCommand(command);
+    api.registerTickHandler(tickHandler);
+    listener = new PingLagListener();
+    plugin.getServer().getPluginManager().registerEvents(listener, plugin);
     plugin.getLogger().info("[FPP-Ping] Enabled.");
   }
 
   @Override
   public void onDisable() {
     if (api != null && command != null) api.unregisterCommand(command);
+    if (api != null) api.unregisterTickHandler(tickHandler);
+    if (listener != null) HandlerList.unregisterAll(listener);
+    unfreezeAll();
+    pendingKnockback.clear();
+    lastStableLocations.clear();
     Config.unregisterExternalConfig("ping", getConfig());
+    listener = null;
     command = null;
     plugin = null;
     api = null;
@@ -90,6 +119,119 @@ public final class FppPingExtension implements FppExtension {
       max = tmp;
     }
     return ThreadLocalRandom.current().nextInt(min, max + 1);
+  }
+
+  private boolean fakeLagEnabled() {
+    return enabled() && getConfig().getBoolean("ping.fake-lag.enabled", true);
+  }
+
+  private boolean movementFreezeEnabled() {
+    return getConfig().getBoolean("ping.fake-lag.movement-freeze", true);
+  }
+
+  private boolean damageKnockbackEnabled() {
+    return getConfig().getBoolean("ping.fake-lag.damage-knockback", true);
+  }
+
+  private int minLagPing() {
+    return Math.max(0, getConfig().getInt("ping.fake-lag.min-ping", 150));
+  }
+
+  private int maxFreezeTicks() {
+    return Math.max(1, getConfig().getInt("ping.fake-lag.max-freeze-ticks", 20));
+  }
+
+  private double knockbackHorizontal() {
+    return Math.max(0.0, getConfig().getDouble("ping.fake-lag.knockback-horizontal", 0.45));
+  }
+
+  private double knockbackVertical() {
+    return Math.max(0.0, getConfig().getDouble("ping.fake-lag.knockback-vertical", 0.35));
+  }
+
+  private int delayTicks(FppBot bot) {
+    int ping = Math.max(0, bot.getPing());
+    if (ping < minLagPing()) return 0;
+    return Math.min(maxFreezeTicks(), Math.max(1, (ping + 49) / 50));
+  }
+
+  private void onBotTick(@NotNull FppBot bot, @NotNull Player entity) {
+    tickCounter++;
+    UUID uuid = bot.getUuid();
+    if (!fakeLagEnabled() || !bot.isAlive() || bot.isBodyless()) {
+      stopFreeze(bot);
+      pendingKnockback.remove(uuid);
+      lastStableLocations.remove(uuid);
+      return;
+    }
+
+    KnockbackState knockback = pendingKnockback.get(uuid);
+    if (knockback != null && tickCounter >= knockback.applyTick()) {
+      pendingKnockback.remove(uuid);
+      stopFreeze(bot);
+      bot.setVelocity(knockback.velocity());
+      lastStableLocations.put(uuid, entity.getLocation());
+      return;
+    }
+
+    FreezeState freeze = frozenBots.get(uuid);
+    if (freeze != null) {
+      if (tickCounter >= freeze.untilTick()) {
+        stopFreeze(bot);
+        lastStableLocations.put(uuid, entity.getLocation());
+      } else {
+        holdStill(bot, entity, freeze.anchor());
+      }
+      return;
+    }
+
+    if (!movementFreezeEnabled() || delayTicks(bot) <= 0) {
+      lastStableLocations.put(uuid, entity.getLocation());
+      return;
+    }
+
+    Location last = lastStableLocations.get(uuid);
+    Location current = entity.getLocation();
+    if (last != null && sameWorld(last, current) && moved(last, current, entity.getVelocity())) {
+      startFreeze(bot, entity, last, delayTicks(bot));
+      return;
+    }
+
+    lastStableLocations.put(uuid, current);
+  }
+
+  private boolean sameWorld(Location a, Location b) {
+    return a.getWorld() != null && a.getWorld().equals(b.getWorld());
+  }
+
+  private boolean moved(Location last, Location current, Vector velocity) {
+    if (last.distanceSquared(current) > 0.0009) return true;
+    return velocity != null && velocity.lengthSquared() > 0.0004;
+  }
+
+  private void startFreeze(FppBot bot, Player entity, Location anchor, int ticks) {
+    UUID uuid = bot.getUuid();
+    frozenBots.put(uuid, new FreezeState(anchor.clone(), tickCounter + Math.max(1, ticks), bot.isFrozen()));
+    holdStill(bot, entity, anchor);
+  }
+
+  private void stopFreeze(FppBot bot) {
+    FreezeState state = frozenBots.remove(bot.getUuid());
+    if (state != null && !state.wasFrozen()) bot.setFrozen(false);
+  }
+
+  private void holdStill(FppBot bot, Player entity, Location anchor) {
+    bot.setFrozen(true);
+    entity.setVelocity(new Vector(0, 0, 0));
+    if (sameWorld(anchor, entity.getLocation()) && anchor.distanceSquared(entity.getLocation()) > 0.0009) {
+      bot.teleport(anchor);
+    }
+  }
+
+  private void unfreezeAll() {
+    if (api == null) return;
+    for (FppBot bot : api.getBots()) stopFreeze(bot);
+    frozenBots.clear();
   }
 
   private boolean has(CommandSender sender, String permission) {
@@ -426,4 +568,41 @@ public final class FppPingExtension implements FppExtension {
     boolean random;
     boolean reset;
   }
+
+  private final class PingLagListener implements Listener {
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBotDamage(EntityDamageByEntityEvent event) {
+      if (!fakeLagEnabled() || !damageKnockbackEnabled()) return;
+      if (!(event.getEntity() instanceof Player player)) return;
+      Optional<FppBot> bot = api.asBot(player);
+      if (bot.isEmpty()) return;
+
+      int delay = delayTicks(bot.get());
+      if (delay <= 0) return;
+
+      Entity source = damageSource(event.getDamager());
+      if (source == null || source.getWorld() != player.getWorld()) return;
+
+      Vector direction = player.getLocation().toVector().subtract(source.getLocation().toVector());
+      direction.setY(0);
+      if (direction.lengthSquared() < 0.0001) direction = player.getLocation().getDirection().multiply(-1);
+      direction.normalize().multiply(knockbackHorizontal()).setY(knockbackVertical());
+
+      UUID uuid = bot.get().getUuid();
+      pendingKnockback.put(uuid, new KnockbackState(direction, tickCounter + delay));
+      startFreeze(bot.get(), player, player.getLocation(), delay);
+    }
+
+    private Entity damageSource(Entity damager) {
+      if (damager instanceof Projectile projectile) {
+        ProjectileSource shooter = projectile.getShooter();
+        if (shooter instanceof Entity entity) return entity;
+      }
+      return damager;
+    }
+  }
+
+  private record FreezeState(Location anchor, long untilTick, boolean wasFrozen) {}
+
+  private record KnockbackState(Vector velocity, long applyTick) {}
 }

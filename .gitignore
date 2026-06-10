@@ -1,63 +1,59 @@
-# Build / Output
-/build/
-*/build/
-target/
-*/target/
-dist/
-out/
+# Project exclude paths
+/target/
 
+# Build / output
+/build/
+dist/
+
+# Extensions
+velocity-companion/
+bungee-companion/
+
+# Maven
+dependency-reduced-pom.xml
+*.class
+*.log
+lukittu-java-simple-main
 # Gradle
-.gradle/
-gradle-app.setting
-!gradle-wrapper.jar
-.gradle-cache/
+.gradle
 
 # IDEs
-/.idea/
+.idea
 *.iml
 *.iws
-*.ipr
 /.project
 /.classpath
 /.settings/
+out/
+
+# Node / frontend
+/node_modules/
+/frontend/node_modules/
+/frontend/.next/
+/frontend/dist/
+/frontend/.vercel/
+.vercel/
+
+# Vercel / serverless
+/.vercel_build_output/
 
 # OS
 .DS_Store
 Thumbs.db
-Desktop.ini
 
 # Environment
 .env
-.env.*
 *.env
 
 # Logs
 logs/
 *.log
 
-# Temp / Cache
+# Misc
 *.swp
-*.swo
-*~
 *.tmp
-.cache/
-
-# Maven (legacy)
-dependency-reduced-pom.xml
-*.class
-
-# Extensions (generated)
-velocity-companion/
-bungee-companion/
-
-# Fake Player Plugin (submodule reference)
-fake-player-plugin/
-
-# Agent / AI files
-*/AGENTS.md
-
-# Documentation (auto-generated)
-*/README.md
 
 # Keep libs (vendor) unless you want to ignore them intentionally
-# /libs/
+*/libs/
+*.jar
+/target/

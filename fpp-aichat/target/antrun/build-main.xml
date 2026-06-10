@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="maven-antrun-" default="main">
+  <target name="main">
+    <mkdir dir="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat/../../builds" />
+    <copy file="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat\target/fpp-aichat.jar" todir="D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat/../../builds" failonerror="false" overwrite="true" />
+    <echo level="info" message="[FPP-AIChat] Build output: D:\Coding and AI Projects\FPP Plugin\fpp-extensions\fpp-aichat/../../builds/fpp-aichat.jar" />
+  </target>
+</project>

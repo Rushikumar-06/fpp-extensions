@@ -44,7 +44,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
 
   @Override
   public @NotNull String getVersion() {
-    return "1.0.1";
+    return "1.1.1";
   }
 
   @Override
@@ -74,6 +74,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     api.registerCommand(lpInfoCommand);
     api.registerCommand(rankCommand);
     Bukkit.getPluginManager().registerEvents(this, core);
+    refreshActiveBotPermissions();
     api.getPlugin().getLogger().info("[FPP-LuckPerms] Enabled.");
   }
 
@@ -109,6 +110,22 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     return core != null ? core.getFakePlayerManager() : null;
   }
 
+  private void refreshActiveBotPermissions() {
+    if (!enabled() || !LuckPermsHelper.isAvailable()) return;
+    FakePlayerManager manager = manager();
+    if (manager == null) return;
+    String defaultGroup = defaultGroup();
+    for (FakePlayer bot : new ArrayList<>(manager.getActivePlayers())) {
+      if (defaultGroup == null || defaultGroup.isBlank()) {
+        LuckPermsHelper.getStoredPrimaryGroup(bot.getUuid())
+            .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
+      } else {
+        LuckPermsHelper.ensureGroupBeforeSpawn(bot.getUuid(), defaultGroup)
+            .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
+      }
+    }
+  }
+
   @EventHandler(priority = EventPriority.LOWEST)
   public void onBotJoinPrepareLuckPerms(PlayerJoinEvent event) {
     if (!enabled() || !LuckPermsHelper.isAvailable()) return;
@@ -129,6 +146,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     if (manager == null) return;
     FakePlayer bot = manager.getByUuid(event.getPlayer().getUniqueId());
     if (bot == null) return;
+    LuckPermsHelper.clearPermissionAttachment(bot.getUuid());
     LuckPermsHelper.refreshUserCache(bot.getUuid());
   }
 

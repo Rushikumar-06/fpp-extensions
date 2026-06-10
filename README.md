@@ -4,7 +4,7 @@ Extended functionality for Fake Player Plugin (FPP) on Minecraft servers.
 
 ## Version
 
-**Current:** 1.1.0
+**Current:** 1.1.1
 
 ## Requirements
 
@@ -12,24 +12,24 @@ Extended functionality for Fake Player Plugin (FPP) on Minecraft servers.
 - Paper/Spigot 1.21+
 - Java 21
 - Fake Player Plugin 1.6.6.12.1+
-- LuckPerms (optional, for group/nametag extensions)
+- LuckPerms (optional, for the LuckPerms extension)
 
 ## Installation
 
 ### Option 1: Full Pack (Recommended)
 
-1. Build the spoof pack:
-   ```bash
-   ./gradlew.bat clean build --no-daemon
+1. Build the spoof pack from the workspace root:
+   ```powershell
+   cmd /c "fake-player-plugin\gradlew.bat -p fpp-extensions build"
    ```
 
-2. Copy `fpp-spoof/build/libs/fpp-spoof-1.1.0-all.jar` to your server's `plugins/FakePlayerPlugin/extensions/` folder
+2. Copy `builds/fpp-spoof.jar` to your server's `plugins/FakePlayerPlugin/extensions/` folder
 
 3. Restart your server
 
 ### Option 2: Individual Extensions
 
-Copy individual `.jar` files from `fpp-*/build/libs/` to your server's `plugins/FakePlayerPlugin/extensions/` folder.
+Copy individual `.jar` files from workspace `builds/` to your server's `plugins/FakePlayerPlugin/extensions/` folder.
 
 ## Extensions Included
 
@@ -37,22 +37,22 @@ Copy individual `.jar` files from `fpp-*/build/libs/` to your server's `plugins/
 |-----------|-------------|----------|-------------|
 | **fpp-aichat** | AI-powered chat for bots using LLM APIs | N/A | `fpp.aichat` |
 | **fpp-chat** | Bot chat with cooldowns and anti-spam | N/A | `fpp.chat` |
-| **fpp-command** | Execute commands as bots | `/fpp cmd` | `fpp.command` |
-| **fpp-groups** | Bot group management | `/fpp group` | `fpp.groups` |
-| **fpp-list** | Advanced player list/tab control | N/A | `fpp.list` |
 | **fpp-luckperms** | LuckPerms integration for bots | N/A | `fpp.luckperms` |
-| **fpp-nametag** | Custom nametags for bots | N/A | `fpp.nametag` |
-| **fpp-peaks** | Display server TPS and performance | `/fpp peaks` | `fpp.peaks` |
+| **fpp-pathfinder** | First-party pathfinding service and settings | N/A | `fpp.pathfinder` |
 | **fpp-ping** | Show or spoof bot ping values | `/fpp ping` | `fpp.ping`, `fpp.ping.set` |
 | **fpp-skin** | Manage bot skins from MCHead/NameMC | `/fpp skin` | `fpp.skin`, `fpp.skin.set` |
+| **fpp-swap** | Bot swap scheduling and rejoin behavior | `/fpp swap` | `fpp.swap` |
 | **fpp-waypoints** | Bot waypoint/pathfinding system | `/fpp waypoint` | `fpp.waypoints` |
 
 ### Excluded Extensions
 
 | Extension | Reason |
 |-----------|--------|
-| fpp-pathfinder | Functionality moved to base FPP plugin |
-| fpp-swap | Incompatible with FPP 1.6.6.12.1 API |
+| fpp-command | Removed from this extension pack |
+| fpp-groups | Removed from this extension pack |
+| fpp-list | Removed from this extension pack |
+| fpp-nametag | Removed from this extension pack |
+| fpp-peaks | Removed from this extension pack |
 
 ## Commands
 
@@ -100,12 +100,6 @@ chat-cooldown-ms: 3000
 chat-random-delay-ms: 2000
 ```
 
-**fpp-list/config.yml**
-```yaml
-enabled: true
-bot-tab-list.enabled: false  # Keep false for LuckPerms compatibility
-```
-
 **fpp-ping/config.yml**
 ```yaml
 enabled: true
@@ -131,26 +125,23 @@ skin-source: "mchead"  # or "namemc"
 | `fpp.skin.random` | Random skins | op |
 | `fpp.aichat` | AI chat | op |
 | `fpp.chat` | Bot chat | op |
-| `fpp.command` | Bot commands | op |
-| `fpp.groups` | Group management | op |
 | `fpp.luckperms` | LuckPerms integration | op |
-| `fpp.nametag` | Nametags | op |
-| `fpp.peaks` | Server stats | op |
-| `fpp.list` | Tab list control | op |
+| `fpp.pathfinder` | Pathfinding | op |
+| `fpp.swap` | Swap management | op |
 | `fpp.waypoints` | Waypoints | op |
 
 ## Building from Source
 
 ```bash
-# Build all extensions
-./gradlew.bat clean build --no-daemon
+# Build all extensions and fpp-spoof.jar from the workspace root
+cmd /c "fake-player-plugin\gradlew.bat -p fpp-extensions build"
 
 # Build specific extension
-./gradlew.bat :fpp-ping:build --no-daemon
+cmd /c "fake-player-plugin\gradlew.bat -p fpp-extensions :fpp-ping:build :fpp-ping:copyExtension"
 
 # Output locations
-fpp-spoof/build/libs/fpp-spoof-1.1.0-all.jar    # Full pack
-fpp-*/build/libs/fpp-*-1.1.0.jar                # Individual extensions
+builds/fpp-spoof.jar    # Full pack
+builds/fpp-*.jar        # Individual extensions
 ```
 
 ## Development
@@ -161,14 +152,11 @@ fpp-*/build/libs/fpp-*-1.1.0.jar                # Individual extensions
 fpp-extensions/
 ├── fpp-aichat/      # AI chat integration
 ├── fpp-chat/        # Bot chat system
-├── fpp-command/     # Command execution
-├── fpp-groups/      # Group management
-├── fpp-list/        # Tab list control
 ├── fpp-luckperms/   # LuckPerms integration
-├── fpp-nametag/     # Custom nametags
-├── fpp-peaks/       # Server performance
+├── fpp-pathfinder/  # Pathfinding service
 ├── fpp-ping/        # Ping spoofing
 ├── fpp-skin/        # Skin management
+├── fpp-swap/        # Swap scheduling
 ├── fpp-waypoints/   # Waypoint system
 └── fpp-spoof/       # Combined pack
 ```
@@ -178,12 +166,11 @@ fpp-extensions/
 1. Create new module in `settings.gradle.kts`
 2. Add `build.gradle.kts` with FPP API dependency
 3. Implement `FppExtension` interface
-4. Add to `fpp-spoof` dependencies
+4. Add to `settings.gradle.kts` and the root `extensionProjects` list so it is included in `fpp-spoof.jar`
 
 ## Known Issues
 
 - **ChatColor deprecation warning:** Uses legacy Bukkit API for compatibility. Safe to ignore.
-- **LuckPerms tab ordering:** Keep `bot-tab-list.enabled: false` to preserve group ordering.
 
 ## Changelog
 

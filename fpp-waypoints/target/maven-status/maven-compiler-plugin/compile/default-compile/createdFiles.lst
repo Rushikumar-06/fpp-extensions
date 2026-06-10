@@ -1,0 +1,5 @@
+me\bill\fppwaypoints\WaypointStore.class
+me\bill\fppwaypoints\FppWaypointsExtension.class
+me\bill\fppwaypoints\PatrolManager.class
+me\bill\fppwaypoints\PatrolManager$PatrolState.class
+me\bill\fppwaypoints\FppWaypointsExtension$WaypointAddonCommand.class

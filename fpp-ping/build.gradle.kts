@@ -7,7 +7,7 @@ java {
 }
 
 group = "me.bill"
-    version = "1.1.0"
+    version = "1.1.1"
 
 repositories {
     mavenCentral()
@@ -32,7 +32,7 @@ tasks.jar {
 
 tasks.register<Copy>("copyExtension") {
     from(tasks.jar)
-    into("../../fake-player-plugin/build/extensions")
+    into("../../builds")
 }
 
 tasks.build {
