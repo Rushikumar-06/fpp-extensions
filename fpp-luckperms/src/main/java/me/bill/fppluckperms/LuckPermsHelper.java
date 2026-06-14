@@ -18,6 +18,7 @@ import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
+import net.luckperms.api.query.QueryOptions;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachment;
@@ -207,24 +208,68 @@ public final class LuckPermsHelper {
     LuckPerms api = lp();
     if (api == null) return;
     User user = api.getUserManager().getUser(uuid);
-    if (user == null) return;
+    if (user == null) {
+      api.getUserManager()
+          .loadUser(uuid)
+          .thenAccept(
+              loaded -> {
+                if (loaded == null) return;
+                FppScheduler.runSync(
+                    plugin,
+                    () -> {
+                      if (player.isOnline()) applyPermissionAttachment(plugin, uuid, player, loaded);
+                    });
+              })
+          .exceptionally(
+              ex -> {
+                FppLogger.warn("[LP] Failed to load user for " + uuid + ": " + ex.getMessage());
+                return null;
+              });
+      return;
+    }
 
-    clearPermissionAttachment(uuid);
-    CachedPermissionData permissionData = user.getCachedData().getPermissionData();
+    applyPermissionAttachment(plugin, uuid, player, user);
+  }
+
+  private static void applyPermissionAttachment(
+      FakePlayerPlugin plugin, UUID uuid, Player player, User user) {
+    LuckPerms api = lp();
+    if (api == null || user == null || player == null || !player.isOnline()) return;
+
+    CachedPermissionData permissionData = getPermissionData(api, user, player);
     Map<String, Boolean> permissions = new LinkedHashMap<>();
     permissionData.getPermissionMap().forEach((permission, value) -> {
       if (permission != null && !permission.isBlank() && value != null) {
         permissions.put(permission, value);
       }
     });
-    if (permissions.equals(lastAppliedPermissions.get(uuid))) return;
 
+    Map<String, Boolean> previous = lastAppliedPermissions.get(uuid);
+    boolean hasAttachment = permissionAttachments.containsKey(uuid);
+    if (permissions.equals(previous) && (hasAttachment || permissions.isEmpty())) return;
+
+    clearPermissionAttachment(uuid);
+    if (permissions.isEmpty()) {
+      lastAppliedPermissions.put(uuid, permissions);
+      return;
+    }
     PermissionAttachment attachment = player.addAttachment(plugin);
     permissionAttachments.put(uuid, attachment);
     for (Map.Entry<String, Boolean> entry : permissions.entrySet()) {
       attachment.setPermission(entry.getKey(), entry.getValue());
     }
     lastAppliedPermissions.put(uuid, permissions);
+  }
+
+  private static CachedPermissionData getPermissionData(LuckPerms api, User user, Player player) {
+    try {
+      api.getContextManager().signalContextUpdate(player);
+      QueryOptions queryOptions = api.getContextManager().getQueryOptions(player);
+      return user.getCachedData().getPermissionData(queryOptions);
+    } catch (Exception e) {
+      debug("Permission context lookup failed for " + player.getName() + ": " + e.getMessage());
+      return user.getCachedData().getPermissionData();
+    }
   }
 
   public static CompletableFuture<String> ensureGroupBeforeSpawn(UUID botUuid, String configGroup) {

@@ -1,5 +1,10 @@
 package me.bill.fppluckperms;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +33,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
 public final class FppLuckPermsExtension implements FppExtension, Listener {
@@ -66,6 +72,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     }
     core = fpp;
     saveDefaultConfig();
+    repairCoreConfigCopy();
     if (manager() != null) LuckPermsHelper.subscribeLpEvents(core, manager());
     displayService = new LuckPermsDisplayService();
     api.registerService(FppBotDisplayService.class, displayService);
@@ -110,13 +117,61 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     return core != null ? core.getFakePlayerManager() : null;
   }
 
+  private void repairCoreConfigCopy() {
+    File dataFolder = getDataFolder();
+    if (dataFolder == null || core == null) return;
+    File configFile = new File(dataFolder, "config.yml");
+    if (!configFile.isFile()) return;
+
+    YamlConfiguration diskConfig = YamlConfiguration.loadConfiguration(configFile);
+    if (!looksLikeCoreConfigCopy(diskConfig)) return;
+
+    YamlConfiguration repaired = loadBundledConfig();
+    if (repaired == null) return;
+    copyIfSet(diskConfig, repaired, "enabled");
+    copyIfSet(diskConfig, repaired, "default-group");
+    copyIfSet(diskConfig, repaired, "permissions.lpinfo");
+    copyIfSet(diskConfig, repaired, "permissions.rank");
+
+    try {
+      repaired.save(configFile);
+      reloadConfig();
+      core.getLogger()
+          .warning(
+              "[FPP-LuckPerms] Replaced stale core config.yml copy with LuckPerms extension defaults.");
+    } catch (IOException e) {
+      core.getLogger().warning("[FPP-LuckPerms] Failed to repair config.yml: " + e.getMessage());
+    }
+  }
+
+  private boolean looksLikeCoreConfigCopy(YamlConfiguration config) {
+    return config.contains("limits")
+        || config.contains("bot-name")
+        || config.contains("persistence")
+        || config.contains("database");
+  }
+
+  private YamlConfiguration loadBundledConfig() {
+    try (InputStream stream = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+      if (stream == null) return null;
+      return YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      core.getLogger().warning("[FPP-LuckPerms] Failed to read bundled config.yml: " + e.getMessage());
+      return null;
+    }
+  }
+
+  private void copyIfSet(YamlConfiguration from, YamlConfiguration to, String path) {
+    if (from.contains(path)) to.set(path, from.get(path));
+  }
+
   private void refreshActiveBotPermissions() {
     if (!enabled() || !LuckPermsHelper.isAvailable()) return;
     FakePlayerManager manager = manager();
     if (manager == null) return;
     String defaultGroup = defaultGroup();
     for (FakePlayer bot : new ArrayList<>(manager.getActivePlayers())) {
-      if (defaultGroup == null || defaultGroup.isBlank()) {
+      if (isExplicitUuidBot(bot) || defaultGroup == null || defaultGroup.isBlank()) {
         LuckPermsHelper.getStoredPrimaryGroup(bot.getUuid())
             .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
       } else {
@@ -133,6 +188,12 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     if (manager == null) return;
     FakePlayer bot = manager.getByUuid(event.getPlayer().getUniqueId());
     if (bot == null) return;
+
+    if (isExplicitUuidBot(bot)) {
+      LuckPermsHelper.getStoredPrimaryGroup(bot.getUuid())
+          .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
+      return;
+    }
 
     String group = LuckPermsHelper.prepareOnlineBotUser(bot.getUuid(), defaultGroup());
     if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
@@ -156,9 +217,10 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     String defaultGroup = defaultGroup();
 
     FppBot apiBot = event.getBot();
-    if (apiBot.hasMetadata("fpp.explicit-uuid-spawn")) return;
 
-    if (defaultGroup == null || defaultGroup.isBlank()) {
+    if (apiBot.hasMetadata("fpp.explicit-uuid-spawn")
+        || defaultGroup == null
+        || defaultGroup.isBlank()) {
       LuckPermsHelper.getStoredPrimaryGroup(apiBot.getUuid())
           .thenAccept(group -> updateSpawnedBotGroup(apiBot.getUuid(), group));
       return;
@@ -180,6 +242,10 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
           manager.refreshDisplayName(bot);
           manager.persistBotSettings(bot);
         });
+  }
+
+  private boolean isExplicitUuidBot(FakePlayer bot) {
+    return bot != null && bot.hasMetadata("fpp.explicit-uuid-spawn");
   }
 
   private static final class LuckPermsDisplayService implements FppBotDisplayService {
