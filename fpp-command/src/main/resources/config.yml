@@ -1,0 +1,7 @@
+enabled: true
+
+permissions:
+  execute: fpp.command.execute
+
+messages:
+  prefix: "&8[&dFPP Command&8]&r "

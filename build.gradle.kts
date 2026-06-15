@@ -9,6 +9,7 @@ val workspaceBuildsDir = rootProject.file("../builds")
 val extensionProjects = listOf(
     "fpp-aichat",
     "fpp-chat",
+    "fpp-command",
     "fpp-luckperms",
     "fpp-pathfinder",
     "fpp-ping",

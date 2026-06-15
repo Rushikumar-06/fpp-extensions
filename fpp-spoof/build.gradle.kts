@@ -17,6 +17,7 @@ repositories {
 dependencies {
     implementation(project(":fpp-aichat"))
     implementation(project(":fpp-chat"))
+    implementation(project(":fpp-command"))
     implementation(project(":fpp-luckperms"))
     implementation(project(":fpp-pathfinder"))
     implementation(project(":fpp-ping"))
@@ -32,6 +33,7 @@ tasks.shadowJar {
     dependsOn(
         ":fpp-aichat:jar",
         ":fpp-chat:jar",
+        ":fpp-command:jar",
         ":fpp-luckperms:jar",
         ":fpp-pathfinder:jar",
         ":fpp-ping:jar",

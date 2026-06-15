@@ -37,6 +37,7 @@ Copy individual `.jar` files from workspace `builds/` to your server's `plugins/
 |-----------|-------------|----------|-------------|
 | **fpp-aichat** | AI-powered chat for bots using LLM APIs | N/A | `fpp.aichat` |
 | **fpp-chat** | Bot chat with cooldowns and anti-spam | N/A | `fpp.chat` |
+| **fpp-command** | Execute commands as bots | `/fpp cmd` | `fpp.command.execute` |
 | **fpp-luckperms** | LuckPerms integration for bots | N/A | `fpp.luckperms` |
 | **fpp-pathfinder** | First-party pathfinding service and settings | N/A | `fpp.pathfinder` |
 | **fpp-ping** | Show or spoof bot ping values | `/fpp ping` | `fpp.ping`, `fpp.ping.set` |
@@ -48,7 +49,6 @@ Copy individual `.jar` files from workspace `builds/` to your server's `plugins/
 
 | Extension | Reason |
 |-----------|--------|
-| fpp-command | Removed from this extension pack |
 | fpp-groups | Removed from this extension pack |
 | fpp-list | Removed from this extension pack |
 | fpp-nametag | Removed from this extension pack |
@@ -85,6 +85,13 @@ Copy individual `.jar` files from workspace `builds/` to your server's `plugins/
 /fpp skin --all --skin <url>       # Set skin for all bots
 /fpp skin --all --random           # Random skins for all bots
 /fpp skin --all --reset            # Reset all bot skins
+```
+
+### Command Extension
+
+```
+/fpp cmd <bot> <command>   # Execute command as bot
+/fpp cmd <bot> --clear     # Clear stored command data
 ```
 
 ## Configuration
@@ -125,6 +132,7 @@ skin-source: "mchead"  # or "namemc"
 | `fpp.skin.random` | Random skins | op |
 | `fpp.aichat` | AI chat | op |
 | `fpp.chat` | Bot chat | op |
+| `fpp.command.execute` | Execute commands as bots | op |
 | `fpp.luckperms` | LuckPerms integration | op |
 | `fpp.pathfinder` | Pathfinding | op |
 | `fpp.swap` | Swap management | op |
@@ -152,6 +160,7 @@ builds/fpp-*.jar        # Individual extensions
 fpp-extensions/
 ├── fpp-aichat/      # AI chat integration
 ├── fpp-chat/        # Bot chat system
+├── fpp-command/     # Bot command execution
 ├── fpp-luckperms/   # LuckPerms integration
 ├── fpp-pathfinder/  # Pathfinding service
 ├── fpp-ping/        # Ping spoofing

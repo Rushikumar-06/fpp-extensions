@@ -17,6 +17,7 @@ rootProject.name = "fpp-extensions"
 
 include("fpp-aichat")
 include("fpp-chat")
+include("fpp-command")
 include("fpp-luckperms")
 include("fpp-pathfinder")
 include("fpp-ping")
