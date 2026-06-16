@@ -171,11 +171,12 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     if (manager == null) return;
     String defaultGroup = defaultGroup();
     for (FakePlayer bot : new ArrayList<>(manager.getActivePlayers())) {
+      LuckPermsHelper.cacheBotName(bot.getUuid(), bot.getName());
       if (isExplicitUuidBot(bot) || defaultGroup == null || defaultGroup.isBlank()) {
         LuckPermsHelper.getStoredPrimaryGroup(bot.getUuid())
             .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
       } else {
-        LuckPermsHelper.ensureGroupBeforeSpawn(bot.getUuid(), defaultGroup)
+        LuckPermsHelper.ensureGroupBeforeSpawn(bot.getUuid(), bot.getName(), defaultGroup)
             .thenAccept(group -> updateSpawnedBotGroup(bot.getUuid(), group));
       }
     }
@@ -188,6 +189,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     if (manager == null) return;
     FakePlayer bot = manager.getByUuid(event.getPlayer().getUniqueId());
     if (bot == null) return;
+    LuckPermsHelper.cacheBotName(bot.getUuid(), bot.getName());
 
     if (isExplicitUuidBot(bot)) {
       LuckPermsHelper.getStoredPrimaryGroup(bot.getUuid())
@@ -195,7 +197,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
       return;
     }
 
-    String group = LuckPermsHelper.prepareOnlineBotUser(bot.getUuid(), defaultGroup());
+    String group = LuckPermsHelper.prepareOnlineBotUser(bot.getUuid(), bot.getName(), defaultGroup());
     if (group != null && !group.isBlank()) bot.setLuckpermsGroup(group);
     LuckPermsHelper.queuePermissionRefresh(core, manager, bot.getUuid());
   }
@@ -217,6 +219,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
     String defaultGroup = defaultGroup();
 
     FppBot apiBot = event.getBot();
+    LuckPermsHelper.cacheBotName(apiBot.getUuid(), apiBot.getName());
 
     if (apiBot.hasMetadata("fpp.explicit-uuid-spawn")
         || defaultGroup == null
@@ -226,7 +229,7 @@ public final class FppLuckPermsExtension implements FppExtension, Listener {
       return;
     }
 
-    LuckPermsHelper.ensureGroupBeforeSpawn(apiBot.getUuid(), defaultGroup)
+    LuckPermsHelper.ensureGroupBeforeSpawn(apiBot.getUuid(), apiBot.getName(), defaultGroup)
         .thenAccept(group -> updateSpawnedBotGroup(apiBot.getUuid(), group));
   }
 

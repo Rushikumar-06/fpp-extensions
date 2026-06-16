@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -130,7 +131,7 @@ public final class FppSwapExtension implements FppExtension {
 
     @Override
     public @NotNull String getUsage() {
-      return "[on|off|status|now <bot>|list|info <bot>]";
+      return "[on|off|status|now <bot>|list|info <bot>|time <session|absence> <minSeconds> <maxSeconds>]";
     }
 
     @Override
@@ -167,6 +168,7 @@ public final class FppSwapExtension implements FppExtension {
         case "on", "true", "yes", "1" -> enableSwap(sender);
         case "off", "false", "no", "0" -> disableSwap(sender);
         case "status" -> sendStatus(sender);
+        case "time" -> handleTime(sender, args);
         case "now" -> {
           if (args.length < 2) {
             sender.sendMessage(Lang.get("swap-now-usage"));
@@ -201,7 +203,19 @@ public final class FppSwapExtension implements FppExtension {
       FakePlayerManager manager = manager();
       if (args.length == 1) {
         String pfx = args[0].toLowerCase();
-        return List.of("on", "off", "status", "now", "list", "info").stream()
+        return List.of("on", "off", "status", "now", "list", "info", "time").stream()
+            .filter(s -> s.startsWith(pfx))
+            .collect(Collectors.toList());
+      }
+      if (args.length == 2 && args[0].equalsIgnoreCase("time")) {
+        String pfx = args[1].toLowerCase();
+        return List.of("session", "absence").stream()
+            .filter(s -> s.startsWith(pfx))
+            .collect(Collectors.toList());
+      }
+      if ((args.length == 3 || args.length == 4) && args[0].equalsIgnoreCase("time")) {
+        String pfx = args[args.length - 1].toLowerCase();
+        return List.of("30", "60", "120", "300", "600", "1200").stream()
             .filter(s -> s.startsWith(pfx))
             .collect(Collectors.toList());
       }
@@ -228,6 +242,72 @@ public final class FppSwapExtension implements FppExtension {
       saveCoreConfigAndReloadSwap();
       sender.sendMessage(Lang.get("swap-disabled"));
       Config.debug("swap.enabled set to false by FPP-Swap");
+    }
+
+    private void handleTime(CommandSender sender, String[] args) {
+      if (args.length == 1) {
+        sendTimeStatus(sender);
+        return;
+      }
+      if (args.length != 4) {
+        sender.sendMessage("Usage: /fpp swap time <session|absence> <minSeconds> <maxSeconds>");
+        return;
+      }
+
+      String type = args[1].toLowerCase(Locale.ROOT);
+      if (!type.equals("session") && !type.equals("absence")) {
+        sender.sendMessage("Time type must be session or absence.");
+        return;
+      }
+
+      Integer min = parsePositiveSeconds(args[2]);
+      Integer max = parsePositiveSeconds(args[3]);
+      if (min == null || max == null) {
+        sender.sendMessage("Time values must be whole seconds greater than 0.");
+        return;
+      }
+      if (max < min) {
+        sender.sendMessage("Max seconds must be greater than or equal to min seconds.");
+        return;
+      }
+
+      String path = type.equals("session") ? "swap.session" : "swap.absence";
+      getConfig().set(path + ".min", min);
+      getConfig().set(path + ".max", max);
+      saveCoreConfigAndReloadSwap();
+      sender.sendMessage(
+          "Swap " + type + " time set to " + formatRange(min, max) + ".");
+      Config.debug(
+          "swap."
+              + type
+              + " time set to "
+              + min
+              + "-"
+              + max
+              + " seconds by "
+              + sender.getName());
+    }
+
+    private void sendTimeStatus(CommandSender sender) {
+      sender.sendMessage(
+          "Swap session time: "
+              + formatRange(Config.swapSessionMin(), Math.max(Config.swapSessionMin(), Config.swapSessionMax())));
+      sender.sendMessage(
+          "Swap absence time: "
+              + formatRange(Config.swapAbsenceMin(), Math.max(Config.swapAbsenceMin(), Config.swapAbsenceMax())));
+    }
+
+    private Integer parsePositiveSeconds(String raw) {
+      try {
+        int value = Integer.parseInt(raw);
+        return value > 0 ? value : null;
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+
+    private String formatRange(int min, int max) {
+      return min == max ? min + "s" : min + "s-" + max + "s";
     }
 
     private void sendStatus(CommandSender sender) {

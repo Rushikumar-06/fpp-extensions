@@ -26,7 +26,14 @@ plugins/FakePlayerPlugin/extensions/
 ## Command
 
 ```text
-/fpp swap [on|off|status|now <bot>|list|info <bot>]
+/fpp swap [on|off|status|now <bot>|list|info <bot>|time <session|absence> <minSeconds> <maxSeconds>]
+```
+
+Examples:
+
+```text
+/fpp swap time session 120 600
+/fpp swap time absence 30 180
 ```
 
 The extension also registers a Swap tab in `/fpp settings`.

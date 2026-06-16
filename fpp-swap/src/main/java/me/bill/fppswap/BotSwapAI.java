@@ -137,33 +137,13 @@ public final class BotSwapAI implements BotSwapController {
           "back at it again",
           "ran into some stuff brb over now");
 
-  public enum Personality {
-    CASUAL(1.0),
-
-    GRINDER(1.6),
-
-    SOCIAL(0.65),
-
-    LURKER(2.2),
-
-    ACTIVE(0.45),
-
-    SPORADIC(1.1);
-
-    public final double sessionMultiplier;
-
-    Personality(double mult) {
-      sessionMultiplier = mult;
-    }
-  }
-
   private final Map<UUID, Integer> sessionTimers = new ConcurrentHashMap<>();
 
   private final Map<UUID, Integer> packingTimers = new ConcurrentHashMap<>();
 
   private final Map<UUID, Integer> rejoinTimers = new ConcurrentHashMap<>();
 
-  private final Map<UUID, Personality> personalities = new ConcurrentHashMap<>();
+  private final Map<UUID, SwapPersonality> personalities = new ConcurrentHashMap<>();
 
   private final Map<UUID, Integer> swapCounts = new ConcurrentHashMap<>();
 
@@ -251,7 +231,7 @@ public final class BotSwapAI implements BotSwapController {
             + " (delay="
             + (delay / 20)
             + "s, personality="
-            + personalities.getOrDefault(id, Personality.CASUAL).name().toLowerCase()
+            + personalities.getOrDefault(id, SwapPersonality.CASUAL).name().toLowerCase()
             + ")");
   }
 
@@ -322,7 +302,7 @@ public final class BotSwapAI implements BotSwapController {
   }
 
   public String getPersonalityLabel(UUID uuid) {
-    Personality p = personalities.get(uuid);
+    SwapPersonality p = personalities.get(uuid);
     return p != null ? p.name().toLowerCase() : "unset";
   }
 
@@ -358,7 +338,7 @@ public final class BotSwapAI implements BotSwapController {
     }
 
     UUID leavingUuid = fp.getUuid();
-    Personality p = personalities.getOrDefault(leavingUuid, Personality.CASUAL);
+    SwapPersonality p = personalities.getOrDefault(leavingUuid, SwapPersonality.CASUAL);
     int newCount = swapCounts.getOrDefault(leavingUuid, 0) + 1;
     Location lastLoc = fp.getLiveLocation();
     String oldName = fp.getName();
@@ -463,7 +443,7 @@ public final class BotSwapAI implements BotSwapController {
   }
 
   private void doRejoin(
-      UUID leavingUuid, Location loc, String oldName, int newSwapCount, Personality p) {
+      UUID leavingUuid, Location loc, String oldName, int newSwapCount, SwapPersonality p) {
     swappedOut.decrementAndGet();
 
     if (!Config.swapEnabled()) return;
@@ -571,7 +551,7 @@ public final class BotSwapAI implements BotSwapController {
   }
 
   private long sessionDurationTicks(UUID botUuid) {
-    Personality p = personalities.getOrDefault(botUuid, Personality.CASUAL);
+    SwapPersonality p = personalities.getOrDefault(botUuid, SwapPersonality.CASUAL);
     int minSec = Config.swapSessionMin();
     int maxSec = Math.max(minSec, Config.swapSessionMax());
     int spread = maxSec - minSec;
@@ -581,7 +561,7 @@ public final class BotSwapAI implements BotSwapController {
     double growth = 1.0 + (Math.min(count, 5) * 0.08);
 
     double sporadic =
-        p == Personality.SPORADIC ? 0.6 + ThreadLocalRandom.current().nextDouble() * 0.8 : 1.0;
+        p == SwapPersonality.SPORADIC ? 0.6 + ThreadLocalRandom.current().nextDouble() * 0.8 : 1.0;
     long ticks = (long) (baseSec * p.sessionMultiplier * growth * sporadic * 20.0);
     return Math.max(200L, ticks);
   }
@@ -656,14 +636,14 @@ public final class BotSwapAI implements BotSwapController {
     }
   }
 
-  private static Personality randomPersonality() {
+  private static SwapPersonality randomPersonality() {
     double r = ThreadLocalRandom.current().nextDouble();
-    if (r < 0.15) return Personality.GRINDER;
-    else if (r < 0.30) return Personality.SOCIAL;
-    else if (r < 0.44) return Personality.LURKER;
-    else if (r < 0.58) return Personality.ACTIVE;
-    else if (r < 0.68) return Personality.SPORADIC;
-    else return Personality.CASUAL;
+    if (r < 0.15) return SwapPersonality.GRINDER;
+    else if (r < 0.30) return SwapPersonality.SOCIAL;
+    else if (r < 0.44) return SwapPersonality.LURKER;
+    else if (r < 0.58) return SwapPersonality.ACTIVE;
+    else if (r < 0.68) return SwapPersonality.SPORADIC;
+    else return SwapPersonality.CASUAL;
   }
 
   private static <T> T randomFrom(List<T> list) {

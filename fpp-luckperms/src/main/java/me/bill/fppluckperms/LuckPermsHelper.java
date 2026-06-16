@@ -273,14 +273,25 @@ public final class LuckPermsHelper {
   }
 
   public static CompletableFuture<String> ensureGroupBeforeSpawn(UUID botUuid, String configGroup) {
+    return ensureGroupBeforeSpawn(botUuid, null, configGroup);
+  }
+
+  public static CompletableFuture<String> ensureGroupBeforeSpawn(
+      UUID botUuid, String botName, String configGroup) {
     LuckPerms api = lp();
     if (api == null) return CompletableFuture.completedFuture("default");
 
     String targetGroup =
         (configGroup != null && !configGroup.trim().isEmpty()) ? configGroup.trim() : "default";
+    String username = normaliseUsername(botName);
+    CompletableFuture<User> userFuture =
+        username != null
+            ? api.getUserManager()
+                .savePlayerData(botUuid, username)
+                .thenCompose(result -> api.getUserManager().loadUser(botUuid, username))
+            : api.getUserManager().loadUser(botUuid);
 
-    return api.getUserManager()
-        .loadUser(botUuid)
+    return userFuture
         .thenCompose(
             user -> {
               if (user == null) return CompletableFuture.completedFuture(targetGroup);
@@ -329,14 +340,49 @@ public final class LuckPermsHelper {
             });
   }
 
+  public static CompletableFuture<Void> cacheBotName(UUID botUuid, String botName) {
+    LuckPerms api = lp();
+    String username = normaliseUsername(botName);
+    if (api == null || botUuid == null || username == null) {
+      return CompletableFuture.completedFuture(null);
+    }
+
+    return api.getUserManager()
+        .savePlayerData(botUuid, username)
+        .thenCompose(result -> api.getUserManager().loadUser(botUuid, username))
+        .thenAccept(
+            user -> {
+              if (user != null) user.getCachedData().invalidate();
+              debug("Cached LP username '" + username + "' for bot " + botUuid);
+            })
+        .exceptionally(
+            ex -> {
+              FppLogger.warn(
+                  "[LP] Failed to cache bot name '" + username + "' for " + botUuid + ": "
+                      + ex.getMessage());
+              return null;
+            });
+  }
+
   public static String prepareOnlineBotUser(UUID botUuid, String configGroup) {
+    return prepareOnlineBotUser(botUuid, null, configGroup);
+  }
+
+  public static String prepareOnlineBotUser(UUID botUuid, String botName, String configGroup) {
     LuckPerms api = lp();
     if (api == null) return "default";
 
     String targetGroup =
         (configGroup != null && !configGroup.trim().isEmpty()) ? configGroup.trim() : "default";
+    String username = normaliseUsername(botName);
     try {
-      User user = api.getUserManager().loadUser(botUuid).get(2, TimeUnit.SECONDS);
+      User user;
+      if (username != null) {
+        api.getUserManager().savePlayerData(botUuid, username).get(2, TimeUnit.SECONDS);
+        user = api.getUserManager().loadUser(botUuid, username).get(2, TimeUnit.SECONDS);
+      } else {
+        user = api.getUserManager().loadUser(botUuid).get(2, TimeUnit.SECONDS);
+      }
       if (user == null) return targetGroup;
 
       String storedPrimary = user.getPrimaryGroup();
@@ -359,6 +405,12 @@ public final class LuckPermsHelper {
       FppLogger.warn("[LP] prepareOnlineBotUser error for " + botUuid + ": " + e.getMessage());
       return targetGroup;
     }
+  }
+
+  private static String normaliseUsername(String username) {
+    if (username == null) return null;
+    String trimmed = username.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   public static CompletableFuture<Void> applyGroupToOnlineUser(UUID botUuid, String groupName) {
